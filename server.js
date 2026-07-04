@@ -8,7 +8,13 @@ const cors = require('cors');
 const app = express();
 const port = 5000;
 
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Authorization'],
+    credentials: false
+}));
 app.use(bodyParser.json());
 
 const db = mysql.createConnection({
@@ -42,27 +48,105 @@ app.post('/api/register', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: "Заполните все поля" });
+    }
+
+    if (username.includes('@')) {
+        const sql = 'SELECT * FROM admins WHERE email = ?';
+        db.query(sql, [username], async (err, result) => {
+            if (err) {
+                console.error('Ошибка БД:', err);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+
+            if (result.length === 0) {
+                return res.status(400).json({ message: "Администратор не найден" });
+            }
+
+            const admin = result[0];
+            try {
+                const isPasswordValid = await bcrypt.compare(password, admin.password);
+                console.log('Проверка пароля:', isPasswordValid); // Должно быть true
+
+                if (!isPasswordValid) {
+                    return res.status(400).json({ message: "Неверный пароль" });
+                }
+
+                const token = jwt.sign({ id: admin.id }, 'adminsecretkey', { expiresIn: '1h' });
+                res.json({ 
+                    token, 
+                    isAdmin: true,
+                    user: {}
+                });
+            } catch (error) {
+                console.error('Ошибка проверки пароля:', error);
+                res.status(500).json({ message: "Ошибка сервера" });
+            }
+        }); // <-- Проверьте, что здесь нет лишних скобок
+    } else {
+        // Код для пользователей
+        const sql = 'SELECT * FROM users WHERE username = ?';
+        db.query(sql, [username], (err, result) => {
+            if (err) {
+                console.error('Ошибка БД:', err);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+
+            if (result.length === 0) {
+                return res.status(400).json({ message: "Пользователь не найден" });
+            }
+
+            const user = result[0];
+            const isPasswordValid = bcrypt.compareSync(password, user.password);
+            
+            if (!isPasswordValid) {
+                return res.status(400).json({ message: "Неверный пароль" });
+            }
+
+            const token = jwt.sign({ id: user.id }, 'secretkey', { expiresIn: '1h' });
+            res.json({ 
+                token,
+                user: { 
+                    username: user.username, 
+                    email: user.email, 
+                    phone: user.phone 
+                }
+            });
+        }); // <-- И здесь
+    }
+});
+// Мидлвар для админов
+function adminAuth(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).send('Доступ запрещен');
+    
+    jwt.verify(token, 'adminsecretkey', (err, decoded) => {
+        if (err) return res.status(401).send('Недействительный токен');
+        req.adminId = decoded.id; // Добавляем ID администратора
+        next();
+    });
+}
+
+function checkUser(username, password, res) {
     const sql = 'SELECT * FROM users WHERE username = ?';
     db.query(sql, [username], (err, result) => {
-        if (err) {
-            console.error('Error finding user:', err);
-            res.status(500).send('Error finding user');
-            return;
+        if (err) return res.status(500).send('Ошибка сервера');
+        if (result.length === 0) return res.status(400).send('Пользователь не найден');
+        
+        const user = result[0];
+        if (!bcrypt.compareSync(password, user.password)) {
+            return res.status(400).send('Неверный пароль');
         }
-        if (result.length > 0) {
-            const user = result[0];
-            const isPasswordCorrect = bcrypt.compareSync(password, user.password);
-            if (isPasswordCorrect) {
-                const token = jwt.sign({ id: user.id }, 'secretkey', { expiresIn: '1h' });
-                res.json({ token, user: { username: user.username, email: user.email, phone: user.phone } });
-            } else {
-                res.status(400).send('Invalid password');
-            }
-        } else {
-            res.status(400).send('User not found');
-        }
+        
+        const token = jwt.sign({ id: user.id }, 'secretkey', { expiresIn: '1h' });
+        res.json({ 
+            token,
+            user: { username: user.username, email: user.email, phone: user.phone } 
+        });
     });
-});
+}
 
 app.get('/api/user', (req, res) => {
     const token = req.headers['authorization']?.split(' ')[1];
@@ -90,15 +174,119 @@ app.get('/api/user', (req, res) => {
     });
 });
 
+app.get('/api/user/orders', (req, res) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).send('Unauthorized');
+
+    jwt.verify(token, 'secretkey', (err, decoded) => {
+        if (err) return res.status(401).send('Unauthorized');
+
+        const sql = `SELECT id, items, total, status, created_at FROM orders WHERE userId = ?`;
+        
+        db.query(sql, [decoded.id], (err, results) => {
+            if (err) {
+                console.error('Error fetching orders:', err);
+                return res.status(500).send('Server error');
+            }
+
+            const orders = results.map(order => {
+                try {
+                    // Убираем лишние кавычки и экранирование
+                    const fixedItems = order.items
+                        .replace(/^"+|"+$/g, '') // Удаляем обрамляющие кавычки
+                        .replace(/\\"/g, '"');    // Убираем экранирование
+                    
+                    return {
+                        ...order,
+                        items: JSON.parse(fixedItems)
+                    };
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    return { ...order, items: [] };
+                }
+            });
+
+            res.json(orders);
+        });
+    });
+});
+// Вспомогательная функция для безопасного парсинга
+function safeJsonParse(str) {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        console.error('JSON parse error:', e);
+        return [];
+    }
+}
+
 app.get('/api/houses', (req, res) => {
-    const sql = 'SELECT id, name, description, price, image_url FROM houses';
-    db.query(sql, (err, result) => {
+    const sql = `
+        SELECT 
+            id, 
+            name, 
+            description,
+            price, 
+            image_url, 
+            area, 
+            plotArea, 
+            floors, 
+            bedrooms, 
+            bathrooms 
+        FROM houses
+    `;
+    
+    db.query(sql, (err, results) => {
         if (err) {
-            console.error('Error fetching houses:', err);
-            res.status(500).send('Error fetching houses');
-            return;
+            console.error('Ошибка БД:', err);
+            return res.status(500).json({ 
+                error: 'Ошибка сервера при получении данных' 
+            });
         }
-        res.json(result);
+        
+        res.json(results); // Всегда возвращаем массив, даже пустой
+    });
+});
+
+// Создание товара
+app.post('/api/houses', adminAuth, (req, res) => {
+    const { name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms } = req.body;
+    
+    // Проверка обязательных полей
+    if (!name || !description || price === undefined) {
+        return res.status(400).json({ error: 'Не заполнены обязательные поля: название, описание, цена' });
+    }
+    
+    const sql = `
+        INSERT INTO houses 
+        (name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    db.query(sql, [
+        name, 
+        description, 
+        parseFloat(price) || 0, 
+        image_url || 'https://via.placeholder.com/150', 
+        parseFloat(area) || 0, 
+        parseFloat(plotArea) || 0, 
+        parseInt(floors) || 0, 
+        parseInt(bedrooms) || 0, 
+        parseInt(bathrooms) || 0
+    ], (err, result) => {
+        if (err) {
+            console.error('Ошибка добавления дома:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при добавлении товара' });
+        }
+        // Возвращаем созданный товар со всеми данными
+        const newHouseId = result.insertId;
+        const selectSql = 'SELECT * FROM houses WHERE id = ?';
+        db.query(selectSql, [newHouseId], (err, results) => {
+            if (err || results.length === 0) {
+                return res.status(500).json({ error: 'Ошибка при получении созданного дома' });
+            }
+            res.json(results[0]);
+        });
     });
 });
 
@@ -117,6 +305,77 @@ app.get('/api/houses/:id', (req, res) => {
         } else {
             res.status(400).send('House not found');
         }
+    });
+});
+
+// Удаление товара
+app.delete('/api/houses/:id', adminAuth, (req, res) => {
+    const houseId = req.params.id;
+    const sql = 'DELETE FROM houses WHERE id = ?';
+    
+    db.query(sql, [houseId], (err, result) => {
+        if (err) {
+            console.error('Ошибка удаления дома:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при удалении товара' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        res.json({ success: true, message: 'Товар удален' });
+    });
+});
+
+// Обновление товара
+app.put('/api/houses/:id', adminAuth, (req, res) => {
+    const houseId = req.params.id;
+    const { name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms } = req.body;
+    
+    // Проверка обязательных полей
+    if (!name || !description || price === undefined) {
+        return res.status(400).json({ error: 'Не заполнены обязательные поля: название, описание, цена' });
+    }
+    
+    const sql = `
+        UPDATE houses SET 
+            name = ?, 
+            description = ?, 
+            price = ?, 
+            image_url = ?, 
+            area = ?, 
+            plotArea = ?, 
+            floors = ?, 
+            bedrooms = ?, 
+            bathrooms = ?
+        WHERE id = ?
+    `;
+    
+    db.query(sql, [
+        name, 
+        description, 
+        parseFloat(price) || 0, 
+        image_url || 'https://via.placeholder.com/150', 
+        parseFloat(area) || 0, 
+        parseFloat(plotArea) || 0, 
+        parseInt(floors) || 0, 
+        parseInt(bedrooms) || 0, 
+        parseInt(bathrooms) || 0,
+        houseId
+    ], (err, result) => {
+        if (err) {
+            console.error('Ошибка обновления дома:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при обновлении товара' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        // Возвращаем обновленный товар
+        const selectSql = 'SELECT * FROM houses WHERE id = ?';
+        db.query(selectSql, [houseId], (err, results) => {
+            if (err || results.length === 0) {
+                return res.status(500).json({ error: 'Ошибка при получении обновленного товара' });
+            }
+            res.json(results[0]);
+        });
     });
 });
 
@@ -202,16 +461,29 @@ app.post('/api/compare', (req, res) => {
 app.get('/api/compare', (req, res) => {
     const token = req.headers['authorization']?.split(' ')[1];
     jwt.verify(token, 'secretkey', (err, decoded) => {
-        if (err) {
-            res.status(401).send('Unauthorized');
-            return;
-        }
-        const sql = 'SELECT h.id, h.name, h.description, h.price, h.image_url FROM houses h JOIN compare c ON h.id = c.productId WHERE c.userId = ?';
+        if (err) return res.status(401).send('Unauthorized');
+        
+        const sql = `
+            SELECT 
+                h.id,
+                h.name,
+                h.description,
+                h.price,
+                h.image_url,
+                h.area,
+                h.plotArea,
+                h.floors,
+                h.bedrooms,
+                h.bathrooms
+            FROM houses h
+            JOIN compare c ON h.id = c.productId
+            WHERE c.userId = ?
+        `;
+        
         db.query(sql, [decoded.id], (err, result) => {
             if (err) {
                 console.error('Error fetching compare list:', err);
-                res.status(500).send('Error fetching compare list');
-                return;
+                return res.status(500).send('Error fetching compare list');
             }
             res.json(result);
         });
@@ -240,39 +512,254 @@ app.delete('/api/compare/:productId', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
     const token = req.headers['authorization']?.split(' ')[1];
-    const { items, name, phone, email } = req.body;
+    const { items, total, name, phone, email } = req.body; // Добавляем получение данных
+
+    // Проверка обязательных полей
+    if (!name || !phone || !email) {
+        return res.status(400).json({ error: "Заполните все обязательные поля" });
+    }
+
     jwt.verify(token, 'secretkey', (err, decoded) => {
-        if (err) {
-            res.status(401).send('Unauthorized');
-            return;
+        if (err) return res.status(401).send('Unauthorized');
+
+        const numericTotal = parseFloat(total);
+        if (isNaN(numericTotal)) {
+            return res.status(400).json({ error: "Неверная сумма заказа" });
         }
-        const sql = 'INSERT INTO orders (userId, items, name, phone, email) VALUES (?, ?, ?, ?, ?)';
-        db.query(sql, [decoded.id, JSON.stringify(items), name, phone, email], (err, result) => {
+
+        const sql = `
+            INSERT INTO orders 
+                (userId, items, total, name, phone, email) 
+            VALUES 
+                (?, ?, ?, ?, ?, ?)
+        `;
+        
+        db.query(sql, [
+            decoded.id,
+            JSON.stringify(items),
+            numericTotal.toFixed(2),
+            name,
+            phone,
+            email
+        ], (err, result) => {
             if (err) {
-                console.error('Error placing order:', err);
-                res.status(500).send('Error placing order');
-                return;
+                console.error('Error creating order:', err);
+                return res.status(500).send('Ошибка создания заказа');
             }
-            res.send('Order placed successfully');
+            res.json({ success: true });
         });
     });
 });
 
-app.get('/api/admin/orders', (req, res) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    jwt.verify(token, 'adminsecretkey', (err, decoded) => {
+// Отчёты
+// Получение списка пользователей (для админки)
+app.get('/api/admin/users', adminAuth, (req, res) => {
+    const sql = 'SELECT id, username, email, phone, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") as created_at FROM users';
+    db.query(sql, (err, results) => {
         if (err) {
-            res.status(401).send('Unauthorized');
-            return;
+            console.error('Ошибка получения пользователей:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при получении пользователей' });
         }
-        const sql = 'SELECT o.id, o.items, o.name, o.phone, o.email, u.username FROM orders o JOIN users u ON o.userId = u.id';
-        db.query(sql, (err, result) => {
-            if (err) {
-                console.error('Error fetching orders:', err);
-                res.status(500).send('Error fetching orders');
-                return;
+        res.json(results);
+    });
+});
+
+// Удаление пользователя
+app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
+    const userId = req.params.id;
+    const sql = 'DELETE FROM users WHERE id = ?';
+    
+    db.query(sql, [userId], (err, result) => {
+        if (err) {
+            console.error('Ошибка удаления пользователя:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при удалении пользователя' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Пользователь не найден' });
+        }
+        res.json({ success: true, message: 'Пользователь удален' });
+    });
+});
+
+// Добавляем новые маршруты для отчётов
+app.get('/api/admin/reports/summary', adminAuth, (req, res) => {
+    const queries = {
+        totalProducts: 'SELECT COUNT(*) AS count FROM houses',
+        totalUsers: 'SELECT COUNT(*) AS count FROM users',
+        totalOrders: 'SELECT COUNT(*) AS count FROM orders',
+        totalRevenue: 'SELECT SUM(total) AS revenue FROM orders WHERE status = "Доставлен"'
+    };
+    
+    const results = {};
+    const promises = Object.keys(queries).map(key => {
+        return new Promise((resolve, reject) => {
+            db.query(queries[key], (err, result) => {
+                if (err) {
+                    console.error(`Ошибка при выполнении запроса ${key}:`, err);
+                    results[key] = null;
+                } else {
+                    results[key] = result[0].count || result[0].revenue || 0;
+                }
+                resolve();
+            });
+        });
+    });
+
+    Promise.all(promises)
+        .then(() => res.json(results))
+        .catch(error => {
+            console.error('Ошибка при формировании отчета:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        });
+});
+
+app.get('/api/admin/reports/products-stats', adminAuth, (req, res) => {
+    const sql = `
+        SELECT
+            h.name,
+            COUNT(DISTINCT o.id) AS order_count,
+            SUM(o.total) AS total_revenue
+        FROM houses h
+        JOIN orders o ON JSON_SEARCH(o.items, 'one', CAST(h.id AS CHAR)) IS NOT NULL
+        WHERE o.status IN ('В обработке', 'Собирается', 'В пути', 'Доставлен')
+        GROUP BY h.id
+        ORDER BY order_count DESC
+    `;
+    
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Ошибка получения статистики по товарам:', err);
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+        res.json(results);
+    });
+});
+
+app.get('/api/admin/reports/users-activity', adminAuth, (req, res) => {
+    const sql = `
+        SELECT
+            u.username,
+            u.email,
+            COUNT(DISTINCT o.id) AS order_count,
+            SUM(o.total) AS total_spent,
+            MAX(o.created_at) AS last_order_date
+        FROM users u
+        JOIN orders o ON u.id = o.userId
+        WHERE o.status IN ('В обработке', 'Собирается', 'В пути', 'Доставлен')
+        GROUP BY u.id
+        ORDER BY total_spent DESC
+    `;
+    
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Ошибка получения статистики по пользователям:', err);
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+        res.json(results);
+    });
+});
+
+app.get('/api/admin/reports/orders', (req, res) => {
+    const sql = `
+        SELECT o.*, u.username 
+        FROM orders o 
+        JOIN users u ON o.userId = u.id
+    `;
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).send('Ошибка сервера');
+        res.json(result);
+    });
+});
+
+app.get('/api/admin/reports/products', (req, res) => {
+    const sql = `
+        SELECT 
+            COUNT(*) as total_products,
+            SUM(price) as total_revenue,
+            AVG(price) as avg_price
+        FROM houses
+    `;
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).send('Ошибка сервера');
+        res.json(result[0]);
+    });
+});
+
+app.get('/api/admin/reports/users', adminAuth, (req, res) => {
+    const sql = 'SELECT id, username, email FROM users';
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).send('Ошибка сервера');
+        res.json(result);
+    });
+});
+
+// Получение заказов (для админки)
+app.get('/api/admin/orders', adminAuth, (req, res) => {
+    const sql = `
+        SELECT 
+            o.id, 
+            o.items, 
+            o.total, 
+            o.status, 
+            DATE_FORMAT(o.created_at, "%Y-%m-%d %H:%i:%s") as created_at,
+            o.name,
+            o.phone,
+            o.email
+        FROM orders o
+        ORDER BY o.created_at DESC
+    `;
+    
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Ошибка получения заказов:', err);
+            return res.status(500).json({ error: 'Ошибка сервера при получении заказов' });
+        }
+        
+        // Преобразуем строки items в массивы объектов
+        const orders = results.map(order => {
+            try {
+                // Если items - строка, парсим её
+                const items = typeof order.items === 'string' 
+                    ? JSON.parse(order.items) 
+                    : order.items;
+                
+                return {
+                    ...order,
+                    items: Array.isArray(items) ? items : []
+                };
+            } catch (e) {
+                console.error('Ошибка парсинга items:', e);
+                return {
+                    ...order,
+                    items: []
+                };
             }
-            res.json(result);
+        });
+        
+        res.json(orders);
+    });
+});
+
+app.put('/api/admin/orders/:id/status', (req, res) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    const { id } = req.params;
+    const { status } = req.body;
+
+    jwt.verify(token, 'adminsecretkey', (err) => {
+        if (err) return res.status(401).send('Unauthorized');
+        
+        const validStatuses = ['В обработке', 'Собирается', 'В пути', 'Доставлен', 'Отменен'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: "Неверный статус заказа" });
+        }
+
+        const sql = 'UPDATE orders SET status = ? WHERE id = ?';
+        db.query(sql, [status, id], (err) => {
+            if (err) {
+                console.error('Error updating order status:', err);
+                return res.status(500).send('Ошибка обновления статуса');
+            }
+            res.json({ success: true, message: 'Статус обновлен' });
         });
     });
 });
