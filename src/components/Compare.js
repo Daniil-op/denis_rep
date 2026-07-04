@@ -1,101 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import styles from './Compare.module.css';
-import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import logo from '../images/logo.png';
+import API from '../api';
+import Nav from './Nav';
+import Footer from './Footer';
+import styles from './Compare.module.css';
 
 const Compare = ({ token }) => {
-    const [compareList, setCompareList] = useState([]);
-    const navigate = useNavigate();
+    const [list, setList] = useState([]);
 
     useEffect(() => {
-        const fetchCompareList = async () => {
-            try {
-                const response = await axios.get('http://localhost:5000/api/compare', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setCompareList(response.data);
-            } catch (error) {
-                console.error('Failed to fetch compare list', error);
-            }
-        };
-
-        fetchCompareList();
+        if (!token) return;
+        axios.get(`${API}/api/compare`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => setList(r.data)).catch(() => {});
     }, [token]);
 
-    const handleRemoveFromCompare = (productId) => {
-        const updatedCompareList = compareList.filter(item => item.id !== productId);
-        setCompareList(updatedCompareList);
-
-        const removeFromCompare = async () => {
-            try {
-                const response = await axios.delete(`http://localhost:5000/api/compare/${productId}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                alert('Product removed from compare list');
-            } catch (error) {
-                console.error('Failed to remove product from compare list', error);
-            }
-        };
-
-        removeFromCompare();
+    const remove = async (id) => {
+        await axios.delete(`${API}/api/compare/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        setList(list.filter(i => i.id !== id));
     };
 
+    const fields = [
+        ['Площадь', i => `${i.area} м²`],
+        ['Участок', i => `${i.plotArea} м²`],
+        ['Этажей', i => i.floors],
+        ['Спален', i => i.bedrooms],
+        ['Санузлов', i => i.bathrooms],
+        ['Цена', i => `${Number(i.price).toLocaleString('ru-RU')} ₽`],
+    ];
+
     return (
-        <div className={styles.container}>
-            <header className={styles.header}>
-                <Link to="/">
-                    <img src={logo} alt="Logo" className={styles.logo} />
-                </Link>
-                
-                <div className={styles.headerButtons}>
-                    <Link to="/">Главная</Link>
-                    <Link to="/cart">Корзина</Link>
-                    {token ? (
-                        <Link to="/account">Аккаунт</Link>
-                    ) : (
-                        <>
-                            <Link to="/login">Вход</Link>
-                            <Link to="/register">Регистрация</Link>
-                        </>
-                    )}
-                </div>
-            </header>
-            <div className={styles.compareSection}>
-                <h1>Список сравнения</h1>
-                {compareList.length > 0 ? (
-                    compareList.map(item => (
-                        <div key={item.id} className={styles.compareItem}>
-                            <img src={item.image_url} alt={item.name} className={styles.compareImage} />
-                            <div className={styles.compareDetails}>
-                                <h2>{item.name}</h2>
-                                <p>Общая площадь: {item.area} м²</p>
-                                <p>Площадь застройки: {item.plotArea} м²</p>
-                                <p>Этажей: {item.floors}</p>
-                                <p>Спален: {item.bedrooms}</p>
-                                <p>Санузлов: {item.bathrooms}</p>
-                            </div>
-                            <button onClick={() => handleRemoveFromCompare(item.id)} className={styles.removeButton}>Удалить</button>
+        <div>
+            <Nav token={token} />
+            <div className={styles.main}>
+                <h1>Сравнение домов</h1>
+                {!token && <p className={styles.hint}>Войдите чтобы использовать сравнение.</p>}
+                {list.length === 0 && token && <div className={styles.empty}><div>⚖️</div><p>Список сравнения пуст</p></div>}
+                {list.length > 0 && (
+                    <div className={styles.table}>
+                        <div className={styles.headers}>
+                            <div className={styles.labelCol}></div>
+                            {list.map(item => (
+                                <div key={item.id} className={styles.col}>
+                                    <img src={item.image_url} alt={item.name} />
+                                    <h3>{item.name}</h3>
+                                    <button onClick={() => remove(item.id)}>Удалить</button>
+                                </div>
+                            ))}
                         </div>
-                    ))
-                ) : (
-                    <p>Ваш список сравнения пуст.</p>
+                        {fields.map(([label, fn]) => (
+                            <div key={label} className={styles.row}>
+                                <div className={styles.labelCol}>{label}</div>
+                                {list.map(item => <div key={item.id} className={styles.col}>{fn(item)}</div>)}
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
-            <footer className={styles.footer}>
-                <div className={styles.footerButtons}>
-                    <button>8 (800) 355-20-20</button>
-                    <button>Почта</button>
-                    <button>ВКонтакте</button>
-                    <button>Telegram</button>
-                    <button>WhatsApp</button>
-                </div>
-                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
-            </footer>
+            <Footer />
         </div>
     );
 };

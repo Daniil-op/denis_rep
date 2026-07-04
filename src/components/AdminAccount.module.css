@@ -1,114 +1,40 @@
-.container {
-    background: linear-gradient(to bottom, #FFE999, #FFE6C0);
-    font-family: 'Roboto Medium', sans-serif;
-    padding: 20px;
-    text-align: center;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    background-color: #FFE999;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.logoPlaceholder {
-    width: 100px;
-    height: 50px;
-    background-color: #f0f0f0;
-}
-
-.searchBar {
-    display: flex;
-    align-items: center;
-}
-
-.searchBar input {
-    padding: 5px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 10px;
-}
-
-.searchBar button,
-.headerButtons a,
-.footerButtons button,
-.addToCartButton,
-.compareButton {
-    padding: 5px 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #FFA741;
-    cursor: pointer;
-    color: white;
-    text-decoration: none;
-    margin: 0 5px;
-}
-
-.headerButtons a {
-    text-decoration: none;
-    color: #FFA741;
-}
-
-.adminSection {
-    margin: 20px 0;
-    flex: 1;
-}
-
-.products,
-.notifications,
-.orders {
-    margin: 20px 0;
-    padding: 20px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.product,
-.notification,
-.order {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 10px 0;
-    padding: 10px;
-    border-bottom: 1px solid #ccc;
-}
-
-.productImage {
-    width: 100px;
-    height: 100px;
-    border-radius: 8px;
-}
-
-.productDetails,
-.notification,
-.order {
-    flex: 1;
-    margin-left: 20px;
-    text-align: left;
-}
-
-.footer {
-    text-align: center;
-    padding: 20px;
-    background-color: #FFE6C0;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-    width: 100%;
-}
-
-.footerButtons {
-    margin-bottom: 10px;
-}
-
-.footerButtons button {
-    margin: 0 5px;
-}
+.page { min-height: 100vh; background: #f8f6f3; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 0 40px; height: 64px; background: #2c1f14; color: white; }
+.brand { font-size: 20px; font-weight: 700; }
+.logoutBtn { padding: 8px 18px; background: rgba(255,255,255,0.15); border: none; color: white; border-radius: 8px; cursor: pointer; }
+.main { display: flex; max-width: 1200px; margin: 32px auto; padding: 0 24px; gap: 32px; }
+.sidebar { width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.tab, .tabActive { padding: 12px 16px; border-radius: 12px; border: none; cursor: pointer; font-size: 15px; text-align: left; font-weight: 600; transition: all 0.2s; }
+.tab { background: white; color: #555; }
+.tabActive { background: #7c5c3e; color: white; }
+.content { flex: 1; }
+.contentHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.contentHeader h2 { font-size: 24px; font-weight: 800; }
+.addBtn { padding: 10px 20px; background: #7c5c3e; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+h2 { font-size: 24px; font-weight: 800; margin-bottom: 20px; }
+.formCard { background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.formCard h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.formGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.formField label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+.formField input { width: 100%; padding: 10px; border: 2px solid #e8e0d5; border-radius: 8px; font-size: 14px; outline: none; }
+.formField input:focus { border-color: #7c5c3e; }
+.formActions { display: flex; gap: 12px; margin-top: 16px; }
+.saveBtn { padding: 10px 24px; background: #7c5c3e; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.cancelBtn { padding: 10px 24px; background: white; color: #666; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; }
+.productList { display: flex; flex-direction: column; gap: 12px; }
+.productRow { display: flex; align-items: center; gap: 16px; background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.productRow img { width: 80px; height: 60px; object-fit: cover; border-radius: 8px; }
+.productInfo { flex: 1; }
+.productInfo h4 { font-weight: 700; margin-bottom: 4px; }
+.productInfo p { font-size: 14px; color: #666; }
+.rowActions { display: flex; gap: 8px; }
+.rowActions button { padding: 8px 12px; border: none; background: #f8f6f3; border-radius: 8px; cursor: pointer; font-size: 16px; }
+.orderCard { background: white; border-radius: 12px; padding: 20px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.orderTop { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.orderTop span { font-size: 15px; }
+.orderTop span:first-child { font-weight: 700; }
+.statusSelect { padding: 6px 12px; border: 2px solid #e8e0d5; border-radius: 8px; font-size: 14px; margin-left: auto; }
+.table { width: 100%; background: white; border-radius: 12px; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.table th { padding: 14px 16px; text-align: left; font-size: 13px; color: #888; border-bottom: 2px solid #f0e8de; }
+.table td { padding: 14px 16px; font-size: 14px; border-bottom: 1px solid #f8f6f3; }
+.delBtn { padding: 6px 12px; background: #fff5f5; color: #e53e3e; border: 1px solid #fed7d7; border-radius: 8px; cursor: pointer; font-size: 13px; }

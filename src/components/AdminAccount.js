@@ -1,181 +1,140 @@
 import React, { useEffect, useState } from 'react';
-import styles from './AdminAccount.module.css';
-import { Link } from 'react-router-dom';
 import axios from 'axios';
+import API from '../api';
+import styles from './AdminAccount.module.css';
 
 const AdminAccount = ({ handleLogout }) => {
+    const [tab, setTab] = useState('products');
     const [products, setProducts] = useState([]);
-    const [notifications, setNotifications] = useState([]);
     const [orders, setOrders] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [editProduct, setEditProduct] = useState(null);
+    const [newProduct, setNewProduct] = useState(null);
+    const token = localStorage.getItem('adminToken');
+    const headers = { Authorization: `Bearer ${token}` };
 
     useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const token = localStorage.getItem('adminToken');
-                const response = await axios.get('http://localhost:5000/api/houses', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setProducts(response.data);
-            } catch (error) {
-                console.error('Failed to fetch products', error);
-            }
-        };
-
-        const fetchNotifications = async () => {
-            try {
-                const token = localStorage.getItem('adminToken');
-                const response = await axios.get('http://localhost:5000/api/admin/notifications', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setNotifications(response.data);
-            } catch (error) {
-                console.error('Failed to fetch notifications', error);
-            }
-        };
-
-        const fetchOrders = async () => {
-            try {
-                const token = localStorage.getItem('adminToken');
-                const response = await axios.get('http://localhost:5000/api/admin/orders', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setOrders(response.data);
-            } catch (error) {
-                console.error('Failed to fetch orders', error);
-            }
-        };
-
-        fetchProducts();
-        fetchNotifications();
-        fetchOrders();
+        axios.get(`${API}/api/houses`, { headers }).then(r => setProducts(r.data));
+        axios.get(`${API}/api/admin/orders`, { headers }).then(r => setOrders(r.data));
+        axios.get(`${API}/api/admin/users`, { headers }).then(r => setUsers(r.data));
     }, []);
 
-    const handleAddProduct = async (product) => {
-        try {
-            const token = localStorage.getItem('adminToken');
-            await axios.post('http://localhost:5000/api/houses', product, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setProducts([...products, product]);
-        } catch (error) {
-            console.error('Failed to add product', error);
-        }
+    const deleteProduct = async (id) => {
+        if (!window.confirm('Удалить?')) return;
+        await axios.delete(`${API}/api/houses/${id}`, { headers });
+        setProducts(products.filter(p => p.id !== id));
     };
 
-    const handleEditProduct = async (product) => {
-        try {
-            const token = localStorage.getItem('adminToken');
-            await axios.put(`http://localhost:5000/api/houses/${product.id}`, product, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setProducts(products.map(p => p.id === product.id ? product : p));
-        } catch (error) {
-            console.error('Failed to edit product', error);
+    const saveProduct = async (p) => {
+        if (p.id) {
+            const r = await axios.put(`${API}/api/houses/${p.id}`, p, { headers });
+            setProducts(products.map(x => x.id === p.id ? r.data : x));
+        } else {
+            const r = await axios.post(`${API}/api/houses`, p, { headers });
+            setProducts([...products, r.data]);
         }
+        setEditProduct(null);
+        setNewProduct(null);
     };
 
-    const handleDeleteProduct = async (productId) => {
-        try {
-            const token = localStorage.getItem('adminToken');
-            await axios.delete(`http://localhost:5000/api/houses/${productId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setProducts(products.filter(p => p.id !== productId));
-        } catch (error) {
-            console.error('Failed to delete product', error);
-        }
+    const updateStatus = async (id, status) => {
+        await axios.put(`${API}/api/admin/orders/${id}/status`, { status }, { headers });
+        setOrders(orders.map(o => o.id === id ? {...o, status} : o));
     };
 
-    const handleSendNotification = async (notification) => {
-        try {
-            const token = localStorage.getItem('adminToken');
-            await axios.post('http://localhost:5000/api/admin/notifications', notification, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setNotifications([...notifications, notification]);
-        } catch (error) {
-            console.error('Failed to send notification', error);
-        }
+    const deleteUser = async (id) => {
+        if (!window.confirm('Удалить пользователя?')) return;
+        await axios.delete(`${API}/api/admin/users/${id}`, { headers });
+        setUsers(users.filter(u => u.id !== id));
+    };
+
+    const ProductForm = ({ p, onSave, onCancel }) => {
+        const [form, setForm] = useState(p || { name:'',description:'',price:'',image_url:'',area:'',plotArea:'',floors:'',bedrooms:'',bathrooms:'' });
+        return (
+            <div className={styles.formCard}>
+                <h3>{p?.id ? 'Редактировать' : 'Новый товар'}</h3>
+                <div className={styles.formGrid}>
+                    {[['name','Название'],['description','Описание'],['price','Цена'],['image_url','URL фото'],['area','Площадь м²'],['plotArea','Участок м²'],['floors','Этажей'],['bedrooms','Спален'],['bathrooms','Санузлов']].map(([k,l]) => (
+                        <div key={k} className={styles.formField}>
+                            <label>{l}</label>
+                            <input value={form[k] || ''} onChange={e => setForm({...form,[k]:e.target.value})} />
+                        </div>
+                    ))}
+                </div>
+                <div className={styles.formActions}>
+                    <button className={styles.saveBtn} onClick={() => onSave(form)}>Сохранить</button>
+                    <button className={styles.cancelBtn} onClick={onCancel}>Отмена</button>
+                </div>
+            </div>
+        );
     };
 
     return (
-        <div className={styles.container}>
+        <div className={styles.page}>
             <header className={styles.header}>
-                <div className={styles.logoPlaceholder}>
-                    {/* Placeholder for logo */}
-                </div>
-                <div className={styles.searchBar}>
-                    <input type="text" placeholder="Поиск по названию дома" />
-                    <button>Поиск</button>
-                </div>
-                <div className={styles.headerButtons}>
-                    <Link to="/">Главная</Link>
-                    <Link to="/admin/reports">Отчёты</Link>
-                    <button onClick={handleLogout}>Выйти</button>
-                </div>
+                <div className={styles.brand}>🏠 ДомСтрой — Админ</div>
+                <button className={styles.logoutBtn} onClick={handleLogout}>Выйти</button>
             </header>
-            <div className={styles.adminSection}>
-                <h1>Администратор</h1>
-                <div className={styles.products}>
-                    <h2>Товары</h2>
-                    {products.map(product => (
-                        <div key={product.id} className={styles.product}>
-                            <img src={product.image_url} alt={product.name} className={styles.productImage} />
-                            <div className={styles.productDetails}>
-                                <h3>{product.name}</h3>
-                                <p>{product.description}</p>
-                                <p>Цена: {product.price} руб.</p>
-                                <button onClick={() => handleEditProduct(product)}>Редактировать</button>
-                                <button onClick={() => handleDeleteProduct(product.id)}>Удалить</button>
+            <div className={styles.main}>
+                <aside className={styles.sidebar}>
+                    {[['products','🏠 Товары'],['orders','📦 Заказы'],['users','👥 Пользователи']].map(([t,l]) => (
+                        <button key={t} className={tab === t ? styles.tabActive : styles.tab} onClick={() => setTab(t)}>{l}</button>
+                    ))}
+                </aside>
+                <div className={styles.content}>
+                    {tab === 'products' && <>
+                        <div className={styles.contentHeader}>
+                            <h2>Товары ({products.length})</h2>
+                            <button className={styles.addBtn} onClick={() => setNewProduct({})}>+ Добавить</button>
+                        </div>
+                        {newProduct && <ProductForm p={null} onSave={saveProduct} onCancel={() => setNewProduct(null)} />}
+                        {editProduct && <ProductForm p={editProduct} onSave={saveProduct} onCancel={() => setEditProduct(null)} />}
+                        <div className={styles.productList}>
+                            {products.map(p => (
+                                <div key={p.id} className={styles.productRow}>
+                                    <img src={p.image_url} alt={p.name} />
+                                    <div className={styles.productInfo}>
+                                        <h4>{p.name}</h4>
+                                        <p>{Number(p.price).toLocaleString('ru-RU')} ₽ · {p.area} м²</p>
+                                    </div>
+                                    <div className={styles.rowActions}>
+                                        <button onClick={() => setEditProduct(p)}>✏️</button>
+                                        <button onClick={() => deleteProduct(p.id)}>🗑️</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>}
+                    {tab === 'orders' && <>
+                        <h2>Заказы ({orders.length})</h2>
+                        {orders.map(o => (
+                            <div key={o.id} className={styles.orderCard}>
+                                <div className={styles.orderTop}>
+                                    <span>Заказ #{o.id}</span>
+                                    <span>{o.name} · {o.phone}</span>
+                                    <span>{Number(o.total).toLocaleString('ru-RU')} ₽</span>
+                                    <select value={o.status} onChange={e => updateStatus(o.id, e.target.value)} className={styles.statusSelect}>
+                                        {['В обработке','Собирается','В пути','Доставлен','Отменен'].map(s => <option key={s}>{s}</option>)}
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                    <button onClick={() => handleAddProduct({ name: 'New Product', description: 'Description', price: '1000000', image_url: 'image_url' })}>Добавить товар</button>
-                </div>
-                <div className={styles.notifications}>
-                    <h2>Уведомления</h2>
-                    {notifications.map((notification, index) => (
-                        <div key={index} className={styles.notification}>
-                            <p>{notification.message}</p>
-                        </div>
-                    ))}
-                    <button onClick={() => handleSendNotification({ message: 'New Notification' })}>Отправить уведомление</button>
-                </div>
-                <div className={styles.orders}>
-                    <h2>Заказы</h2>
-                    {orders.map(order => (
-                        <div key={order.id} className={styles.order}>
-                            <p>Пользователь: {order.username}</p>
-                            <p>Товары: {order.items.map(item => item.name).join(', ')}</p>
-                            <p>Сумма: {order.totalPrice} руб.</p>
-                        </div>
-                    ))}
+                        ))}
+                    </>}
+                    {tab === 'users' && <>
+                        <h2>Пользователи ({users.length})</h2>
+                        <table className={styles.table}>
+                            <thead><tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Дата</th><th></th></tr></thead>
+                            <tbody>{users.map(u => (
+                                <tr key={u.id}>
+                                    <td>{u.id}</td><td>{u.username}</td><td>{u.email}</td><td>{u.phone}</td>
+                                    <td>{u.created_at?.split(' ')[0]}</td>
+                                    <td><button className={styles.delBtn} onClick={() => deleteUser(u.id)}>Удалить</button></td>
+                                </tr>
+                            ))}</tbody>
+                        </table>
+                    </>}
                 </div>
             </div>
-            <footer className={styles.footer}>
-                <div className={styles.footerButtons}>
-                    <button>8 (800) 355-20-20</button>
-                    <button>Почта</button>
-                    <button>ВКонтакте</button>
-                    <button>Telegram</button>
-                    <button>WhatsApp</button>
-                </div>
-                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
-            </footer>
         </div>
     );
 };

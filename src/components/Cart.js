@@ -1,165 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import styles from './Cart.module.css';
-import { Link } from 'react-router-dom';
 import axios from 'axios';
+import API from '../api';
+import Nav from './Nav';
+import Footer from './Footer';
+import styles from './Cart.module.css';
 
 const Cart = ({ token }) => {
     const [cart, setCart] = useState([]);
-    const [showOrderForm, setShowOrderForm] = useState(false);
-    const [orderDetails, setOrderDetails] = useState({
-        name: '',
-        phone: '',
-        email: ''
-    });
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState({ name: '', phone: '', email: '' });
+    const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchCart = async () => {
-            try {
-                const response = await axios.get('http://localhost:5000/api/cart', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setCart(response.data);
-            } catch (error) {
-                console.error('Failed to fetch cart', error);
-            }
-        };
-
-        fetchCart();
+        if (!token) { setLoading(false); return; }
+        axios.get(`${API}/api/cart`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => { setCart(r.data); setLoading(false); })
+            .catch(() => setLoading(false));
     }, [token]);
 
-    const handleRemoveFromCart = async (productId) => {
-        try {
-            await axios.delete(`http://localhost:5000/api/cart/${productId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setCart(cart.filter(item => item.id !== productId));
-        } catch (error) {
-            console.error('Failed to remove product from cart', error);
-        }
+    const remove = async (id) => {
+        await axios.delete(`${API}/api/cart/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        setCart(cart.filter(i => i.id !== id));
     };
 
-    const handleOrder = async (e) => {
+    const order = async (e) => {
         e.preventDefault();
+        const total = cart.reduce((s, i) => s + parseFloat(i.price), 0);
         try {
-            await axios.post('http://localhost:5000/api/orders', {
-                items: cart,
-                ...orderDetails
-            }, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            alert('Заказ оформлен успешно!');
-            setShowOrderForm(false);
-        } catch (error) {
-            console.error('Failed to place order', error);
-        }
+            await axios.post(`${API}/api/orders`, { items: cart, total, ...form }, { headers: { Authorization: `Bearer ${token}` } });
+            setSuccess(true);
+            setCart([]);
+            setShowForm(false);
+        } catch (err) { alert('Ошибка оформления: ' + (err.response?.data?.error || err.message)); }
     };
 
-    const totalPrice = cart.reduce((total, item) => total + parseFloat(item.price), 0);
+    const total = cart.reduce((s, i) => s + parseFloat(i.price), 0);
 
     return (
-        <div className={styles.container}>
-            <header className={styles.header}>
-                <div className={styles.logoPlaceholder}>
-                    {/* Placeholder for logo */}
-                </div>
-                <div className={styles.searchBar}>
-                    <input type="text" placeholder="Поиск по названию дома" />
-                    <button>Поиск</button>
-                </div>
-                <div className={styles.headerButtons}>
-                    <Link to="/">Главная</Link>
-                    <Link to="/instructions">Инструкции</Link>
-                    <Link to="/compare">Сравнение</Link>
-                    {token ? (
-                        <Link to="/account">Аккаунт</Link>
-                    ) : (
-                        <>
-                            <Link to="/login">Войти</Link>
-                            <Link to="/register">Зарегистрироваться</Link>
-                        </>
-                    )}
-                </div>
-            </header>
-            <div className={styles.cartSection}>
-                <h1>Корзина</h1>
-                {cart.length > 0 ? (
-                    cart.map(item => (
-                        <div key={item.id} className={styles.cartItem}>
-                            <img src={item.image_url} alt={item.name} className={styles.cartImage} />
-                            <div className={styles.cartDetails}>
-                                <h2>{item.name}</h2>
-                                <p>Общая площадь: {item.area} м²</p>
-                                <p>Площадь застройки: {item.plotArea} м²</p>
-                                <p>Этажей: {item.floors}</p>
-                                <p>Спален: {item.bedrooms}</p>
-                                <p>Санузлов: {item.bathrooms}</p>
-                            </div>
-                            <button onClick={() => handleRemoveFromCart(item.id)} className={styles.removeButton}>Удалить</button>
-                        </div>
-                    ))
+        <div>
+            <Nav token={token} />
+            <div className={styles.main}>
+                <h1>Корзина {cart.length > 0 && <span className={styles.count}>{cart.length}</span>}</h1>
+                {success && <div className={styles.success}>✅ Заказ оформлен! Менеджер свяжется с вами.</div>}
+                {!token && <p className={styles.hint}>Войдите в аккаунт чтобы добавлять товары в корзину.</p>}
+                {loading ? <p>Загрузка...</p> : cart.length === 0 && !success ? (
+                    <div className={styles.empty}>
+                        <div className={styles.emptyIcon}>🏠</div>
+                        <p>Корзина пуста</p>
+                    </div>
                 ) : (
-                    <p>Ваша корзина пуста.</p>
+                    <>
+                        <div className={styles.items}>
+                            {cart.map(item => (
+                                <div key={item.id} className={styles.item}>
+                                    <img src={item.image_url} alt={item.name} />
+                                    <div className={styles.itemInfo}>
+                                        <h3>{item.name}</h3>
+                                        <div className={styles.itemSpecs}>
+                                            <span>🏠 {item.area} м²</span>
+                                            <span>🏢 {item.floors} эт.</span>
+                                            <span>🛏 {item.bedrooms} спал.</span>
+                                        </div>
+                                        <div className={styles.itemPrice}>{Number(item.price).toLocaleString('ru-RU')} ₽</div>
+                                    </div>
+                                    <button className={styles.removeBtn} onClick={() => remove(item.id)}>✕</button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className={styles.summary}>
+                            <div className={styles.total}>Итого: <b>{total.toLocaleString('ru-RU')} ₽</b></div>
+                            <button className={styles.orderBtn} onClick={() => setShowForm(true)}>Оформить заказ</button>
+                        </div>
+                    </>
+                )}
+                {showForm && (
+                    <div className={styles.overlay}>
+                        <div className={styles.modal}>
+                            <h2>Оформление заказа</h2>
+                            <form onSubmit={order}>
+                                {[['name','ФИО','text'],['phone','Телефон','text'],['email','Email','email']].map(([key,ph,type]) => (
+                                    <input key={key} type={type} placeholder={ph} required
+                                        value={form[key]} onChange={e => setForm({...form, [key]: e.target.value})} />
+                                ))}
+                                <div className={styles.modalActions}>
+                                    <button type="submit" className={styles.orderBtn}>Подтвердить</button>
+                                    <button type="button" className={styles.cancelBtn} onClick={() => setShowForm(false)}>Отмена</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 )}
             </div>
-            <div className={styles.cartSummary}>
-                <h2>Итоговая стоимость</h2>
-                <p>{totalPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}</p>
-                <button onClick={() => setShowOrderForm(true)}>Оформить заказ</button>
-            </div>
-            {showOrderForm && (
-                <div className={styles.orderForm}>
-                    <h2>Оформление заказа</h2>
-                    <form onSubmit={handleOrder}>
-                        <input
-                            type="text"
-                            placeholder="ФИО"
-                            value={orderDetails.name}
-                            onChange={(e) => setOrderDetails({ ...orderDetails, name: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Номер телефона"
-                            value={orderDetails.phone}
-                            onChange={(e) => setOrderDetails({ ...orderDetails, phone: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            value={orderDetails.email}
-                            onChange={(e) => setOrderDetails({ ...orderDetails, email: e.target.value })}
-                            required
-                        />
-                        <button type="submit">Отправить</button>
-                        <button type="button" onClick={() => setShowOrderForm(false)}>Отмена</button>
-                    </form>
-                </div>
-            )}
-            <div className={styles.cartHelp}>
-                <h2>Мы подскажем с чего начать</h2>
-                <select>
-                    <option value="Город">Город</option>
-                    <option value="Барнаул">Барнаул</option>
-                </select>
-                <button>Продолжить</button>
-            </div>
-            <footer className={styles.footer}>
-                <div className={styles.footerButtons}>
-                    <button>8 (800) 355-20-20</button>
-                    <button>Почта</button>
-                    <button>ВКонтакте</button>
-                    <button>Telegram</button>
-                    <button>WhatsApp</button>
-                </div>
-                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
-            </footer>
+            <Footer />
         </div>
     );
 };

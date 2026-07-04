@@ -1,161 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import styles from './ProductPage.module.css';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import logo from '../images/logo.png';
+import API from '../api';
+import Nav from './Nav';
+import Footer from './Footer';
+import styles from './ProductPage.module.css';
 
 const ProductPage = ({ token }) => {
     const { id } = useParams();
     const [product, setProduct] = useState(null);
-    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [msg, setMsg] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchProduct = async () => {
-            try {
-                const response = await axios.get(`http://localhost:5000/api/houses/${id}`);
-                setProduct(response.data);
-            } catch (error) {
-                console.error('Failed to fetch product', error);
-                setError('Failed to fetch product. Please try again later.');
-            }
-        };
-
-        fetchProduct();
+        axios.get(`${API}/api/houses/${id}`)
+            .then(r => { setProduct(r.data); setLoading(false); })
+            .catch(() => setLoading(false));
     }, [id]);
 
-    const handleAddToCart = async () => {
-        if (!token) {
-            navigate('/login');
-            return;
-        }
-
+    const addToCart = async () => {
+        if (!token) { navigate('/login'); return; }
         try {
-            const response = await axios.post('http://localhost:5000/api/cart', { productId: id }, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            alert('Product added to cart');
-        } catch (error) {
-            console.error('Failed to add product to cart', error);
-            setError('Failed to add product to cart. Please try again later.');
-        }
+            await axios.post(`${API}/api/cart`, { productId: id }, { headers: { Authorization: `Bearer ${token}` } });
+            setMsg('✅ Добавлено в корзину');
+        } catch { setMsg('❌ Ошибка'); }
     };
 
-    const handleCompare = async () => {
-        if (!token) {
-            navigate('/login');
-            return;
-        }
-
+    const addToCompare = async () => {
+        if (!token) { navigate('/login'); return; }
         try {
-            const response = await axios.post('http://localhost:5000/api/compare', { productId: id }, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            alert('Product added to compare list');
-        } catch (error) {
-            console.error('Failed to add product to compare list', error);
-            setError('Failed to add product to compare list. Please try again later.');
-        }
+            await axios.post(`${API}/api/compare`, { productId: id }, { headers: { Authorization: `Bearer ${token}` } });
+            setMsg('✅ Добавлено в сравнение');
+        } catch { setMsg('❌ Ошибка'); }
     };
 
-    if (error) {
-        return <div>{error}</div>;
-    }
-
-    if (!product) {
-        return <div>Loading...</div>;
-    }
+    if (loading) return <div><Nav token={token} /><div className={styles.loading}>Загрузка...</div></div>;
+    if (!product) return <div><Nav token={token} /><div className={styles.loading}>Дом не найден</div></div>;
 
     return (
-        <div className={styles.container}>
-            <header className={styles.header}>
-                <Link to="/">
-                    <img src={logo} alt="Logo" className={styles.logo} />
-                </Link>
-
-                <div className={styles.headerButtons}>
-                    <Link to="/">Главная</Link>
-                    <Link to="/compare">Сравнение</Link>
-                    <Link to="/cart">Корзина</Link>
-                    {token ? (
-                        <Link to="/account">Аккаунт</Link>
-                    ) : (
-                        <>
-                            <Link to="/login">Войти</Link>
-                            <Link to="/register">Зарегистрироваться</Link>
-                        </>
-                    )}
+        <div>
+            <Nav token={token} />
+            <div className={styles.main}>
+                <div className={styles.imgWrap}>
+                    <img src={product.image_url} alt={product.name} />
                 </div>
-            </header>
-            <div className={styles.productSection}>
-                <div className={styles.productImages}>
-                    <img src={product.image_url} className={styles.mainImage} />
-                </div>
-                <div className={styles.productInfo}>
+                <div className={styles.info}>
                     <h1>{product.name}</h1>
-                    <p>{product.description}</p>
-                    <p>Стоимость дома под ключ от {product.price} руб.</p>
-                    <p>Срок строительства – от 4 месяцев</p>
-                    <button onClick={handleAddToCart} className={styles.addToCartButton}>Добавить в корзину</button>
-                    <button onClick={handleCompare} className={styles.compareButton}>Сравнить</button>
-                </div>
-            </div>
-            <div className={styles.productDetails}>
-                <div className={styles.detailsSection}>
-                    <h2>Основные характеристики</h2>
-                    <ul>
-                        <li>Общая площадь: {product.area} м²</li>
-                        <li>Площадь застройки: {product.plotArea} м²</li>
-                        <li>Этажей: {product.floors}</li>
-                        <li>Спален: {product.bedrooms}</li>
-                        <li>Санузлов: {product.bathrooms}</li>
-                    </ul>
-                </div>
-                <div className={styles.detailsSection}>
-                    <h2>Характеристики планировки</h2>
-                    <div className={styles.floorPlans}>
-                        <div className={styles.floorPlan}>
-                            <h3>1 этаж</h3>
-                            <ul>
-                                <li>Тамбур: 5.56 м²</li>
-                                <li>Биллиардная: 8.41 м²</li>
-                                <li>Холл: 7.13 м²</li>
-                                <li>Кинозал: 2.56 м²</li>
-                                <li>Гостиная: 23.18 м²</li>
-                                <li>Кухня: 10.64 м²</li>
-                                <li>Парилка: 5.30 м²</li>
-                                <li>Сан.узел: 10.55 м²</li>
-                            </ul>
-                        </div>
-                        <div className={styles.floorPlan}>
-                            <h3>2 этаж</h3>
-                            <ul>
-                                <li>Холл: 6.34 м²</li>
-                                <li>Спальни: 14.45 м²</li>
-                                <li>Спальни: 18.43 м²</li>
-                                <li>Гардероб: 3.38 м²</li>
-                                <li>Сан.узел: 3.54 м²</li>
-                                <li>Спальни: 13.67 м²</li>
-                                <li>Спальни: 10.89 м²</li>
-                            </ul>
-                        </div>
+                    <p className={styles.desc}>{product.description}</p>
+                    <div className={styles.price}>от {Number(product.price).toLocaleString('ru-RU')} ₽</div>
+                    <div className={styles.specs}>
+                        <div className={styles.spec}><span>Площадь</span><b>{product.area} м²</b></div>
+                        <div className={styles.spec}><span>Участок</span><b>{product.plotArea} м²</b></div>
+                        <div className={styles.spec}><span>Этажей</span><b>{product.floors}</b></div>
+                        <div className={styles.spec}><span>Спален</span><b>{product.bedrooms}</b></div>
+                        <div className={styles.spec}><span>Санузлов</span><b>{product.bathrooms}</b></div>
+                        <div className={styles.spec}><span>Срок</span><b>от 4 мес.</b></div>
+                    </div>
+                    {msg && <div className={styles.msg}>{msg}</div>}
+                    <div className={styles.actions}>
+                        <button className={styles.btnPrimary} onClick={addToCart}>В корзину</button>
+                        <button className={styles.btnSecondary} onClick={addToCompare}>Сравнить</button>
                     </div>
                 </div>
             </div>
-            <footer className={styles.footer}>
-                <div className={styles.footerButtons}>
-                    <button>8 (800) 355-20-20</button>
-                    <button>Почта</button>
-                    <button>ВКонтакте</button>
-                    <button>Telegram</button>
-                    <button>WhatsApp</button>
-                </div>
-                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
-            </footer>
+            <Footer />
         </div>
     );
 };

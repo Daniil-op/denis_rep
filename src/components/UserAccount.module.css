@@ -1,124 +1,19 @@
-.container {
-    background: linear-gradient(to bottom, #FFE999, #FFE6C0);
-    font-family: 'Roboto Condensed', sans-serif;
-    padding: 20px;
-    text-align: center;
-    min-height: 100vh; /* Добавляем минимальную высоту */
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between; /* Размещаем футер в конце страницы */
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    background-color: #FFE999;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-.logo {
-    height: 70px;
-    width: 70px;
-}
-
-.searchBar {
-    display: flex;
-    align-items: center;
-}
-
-.searchBar input {
-    padding: 5px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 10px;
-}
-
-.searchBar button,
-.headerButtons a,
-.headerButtons button,
-.footerButtons button
-{
-    padding: 5px 10px;
-    border: 1px solid #cccccc00;
-    border-radius: 10px;
-    background-color: #FFA741;
-    cursor: pointer;
-    color: white;
-    text-decoration: none;
-    margin: 0 5px;
-}
-
-.headerButtons a {
-    text-decoration: none;
-    color: #ffffff;
-}
-
-.userInfoSection {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    margin: 20px 0;
-}
-
-.userInfo, .cart {
-    margin: 20px 0;
-    padding: 20px;
-    border: 1px solid #cccccc00;
-    border-radius: 10px;
-    background-color: linear-gradient(to bottom, #FFE999, #FFE6C0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    max-width: 400px;
-}
-
-.cart ul {
-    list-style-type: none;
-    padding: 0;
-}
-
-.cart li {
-    margin: 10px 0;
-}
-
-.handleLogout {
-    padding: 10px 20px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #FFA741;
-    cursor: pointer;
-    color: white;
-    margin-top: 20px;
-}
-
-.footer {
-    text-align: center;
-    padding: 20px;
-    background-color: #FFE6C0;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-.footerButtons {
-    margin-bottom: 10px;
-}
-
-.footerButtons button {
-    margin: 0 5px;
-}
-
-::-webkit-scrollbar {
-    width: 8px;
-    background-color: #FFE6C0;
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: #FFA741;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background-color: #FF8C00;
-}
+.main { max-width: 1100px; margin: 48px auto; padding: 0 24px; display: grid; grid-template-columns: 280px 1fr; gap: 32px; }
+.sidebar { background: white; border-radius: 20px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); height: fit-content; text-align: center; }
+.avatar { width: 80px; height: 80px; background: #7c5c3e; color: white; border-radius: 50%; font-size: 32px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.sidebar h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.sidebar p { color: #666; font-size: 14px; margin-bottom: 6px; }
+.logoutBtn { margin-top: 24px; width: 100%; padding: 12px; background: #fff5f5; color: #e53e3e; border: 2px solid #fed7d7; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.content h2 { font-size: 24px; font-weight: 800; margin-bottom: 24px; }
+.empty { text-align: center; padding: 60px; background: white; border-radius: 16px; }
+.empty p { color: #888; font-size: 18px; margin-bottom: 20px; }
+.shopBtn { display: inline-block; padding: 12px 24px; background: #7c5c3e; color: white; border-radius: 10px; font-weight: 600; }
+.order { background: white; border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+.orderHeader { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+.orderHeader span:first-child { font-weight: 700; font-size: 17px; }
+.status { padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #e8f5e9; color: #2e7d32; }
+.orderDate { margin-left: auto; color: #999; font-size: 14px; }
+.orderTotal { font-size: 16px; color: #555; }
+.orderTotal b { color: #7c5c3e; }
+.loading { text-align: center; padding: 80px; font-size: 18px; color: #888; }
+@media (max-width: 768px) { .main { grid-template-columns: 1fr; } }

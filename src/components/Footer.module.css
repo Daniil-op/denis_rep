@@ -1,0 +1,5 @@
+.footer { background: #2c1f14; color: #c8b89a; padding: 40px 0 24px; margin-top: 80px; }
+.inner { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+.brand { font-size: 22px; font-weight: 700; color: #e8d5b7; margin-bottom: 20px; }
+.contacts { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 24px; font-size: 14px; }
+.copy { font-size: 13px; color: #7a6a58; border-top: 1px solid #3d2e1e; padding-top: 20px; margin-top: 8px; }

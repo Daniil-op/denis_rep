@@ -1,86 +1,58 @@
 import React, { useState } from 'react';
-import styles from './Login.module.css';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API from '../api';
+import styles from './Login.module.css';
 
-const Login = ({ setToken, setUser }) => {
+const Login = ({ setToken, isAdmin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
+        setLoading(true);
         setError('');
-        
         try {
-            const response = await axios.post('http://localhost:5000/api/login', {
-                username,
-                password
-            });
-            
-            // Сохраняем токен и данные пользователя
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            
-            setToken(response.data.token);
-            setUser(response.data.user);
-            navigate('/account');
-        } catch (error) {
-            setError(error.response?.data?.message || 'Неверное имя пользователя или пароль');
-        } finally {
-            setIsLoading(false);
-        }
+            const res = await axios.post(`${API}/api/login`, { username, password });
+            if (isAdmin) {
+                if (!res.data.isAdmin) { setError('Нет прав администратора'); return; }
+                localStorage.setItem('adminToken', res.data.token);
+                setToken(res.data.token);
+                navigate('/admin');
+            } else {
+                localStorage.setItem('token', res.data.token);
+                setToken(res.data.token);
+                navigate('/account');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Неверный логин или пароль');
+        } finally { setLoading(false); }
     };
 
     return (
-        <div className={styles.container}>
-            <header className={styles.header}>
-                <div className={styles.logoPlaceholder}></div>
-                <div className={styles.headerButtons}>
-                    <Link to="/">Главная</Link>
-                    <Link to="/register">Регистрация</Link>
-                </div>
-            </header>
-            
-            <div className={styles.loginSection}>
-                <h1>Вход</h1>
+        <div className={styles.page}>
+            <div className={styles.card}>
+                <Link to="/" className={styles.logo}>🏠 ДомСтрой</Link>
+                <h1>{isAdmin ? 'Вход для администратора' : 'Вход в аккаунт'}</h1>
                 <form onSubmit={handleLogin}>
-                    <input
-                        type="text"
-                        placeholder="Имя пользователя"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                        autoComplete="username"
-                    />
-                    <input
-                        type="password"
-                        placeholder="Пароль"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        autoComplete="current-password"
-                    />
-                    <button type="submit" disabled={isLoading}>
-                        {isLoading ? 'Загрузка...' : 'Войти'}
+                    <div className={styles.field}>
+                        <label>{isAdmin ? 'Email' : 'Имя пользователя'}</label>
+                        <input type="text" value={username} onChange={e => setUsername(e.target.value)} required placeholder={isAdmin ? 'admin@example.com' : 'username'} />
+                    </div>
+                    <div className={styles.field}>
+                        <label>Пароль</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" />
+                    </div>
+                    {error && <p className={styles.error}>{error}</p>}
+                    <button type="submit" className={styles.btn} disabled={loading}>
+                        {loading ? 'Загрузка...' : 'Войти'}
                     </button>
                 </form>
-                {error && <p className={styles.error}>{error}</p>}
+                {!isAdmin && <p className={styles.hint}>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></p>}
             </div>
-            
-            <footer className={styles.footer}>
-                <div className={styles.footerButtons}>
-                    <button>8 (800) 355-20-20</button>
-                    <button>Почта</button>
-                    <button>ВКонтакте</button>
-                    <button>Telegram</button>
-                    <button>WhatsApp</button>
-                </div>
-                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
-            </footer>
         </div>
     );
 };
