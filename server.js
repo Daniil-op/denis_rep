@@ -6,10 +6,10 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Authorization'],
@@ -17,12 +17,17 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Purple0457.',
-    database: 'house_sales'
-});
+// Railway передаёт DATABASE_URL или отдельные переменные MYSQL_*
+const db = mysql.createConnection(
+    process.env.DATABASE_URL || {
+        host: process.env.MYSQL_HOST || 'localhost',
+        port: process.env.MYSQL_PORT || 3306,
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || 'house_sales',
+        ssl: process.env.MYSQL_HOST ? { rejectUnauthorized: false } : false
+    }
+);
 
 db.connect((err) => {
     if (err) {
@@ -68,7 +73,6 @@ app.post('/api/login', (req, res) => {
             const admin = result[0];
             try {
                 const isPasswordValid = await bcrypt.compare(password, admin.password);
-                console.log('Проверка пароля:', isPasswordValid); // Должно быть true
 
                 if (!isPasswordValid) {
                     return res.status(400).json({ message: "Неверный пароль" });
@@ -84,9 +88,8 @@ app.post('/api/login', (req, res) => {
                 console.error('Ошибка проверки пароля:', error);
                 res.status(500).json({ message: "Ошибка сервера" });
             }
-        }); // <-- Проверьте, что здесь нет лишних скобок
+        });
     } else {
-        // Код для пользователей
         const sql = 'SELECT * FROM users WHERE username = ?';
         db.query(sql, [username], (err, result) => {
             if (err) {
@@ -114,17 +117,17 @@ app.post('/api/login', (req, res) => {
                     phone: user.phone 
                 }
             });
-        }); // <-- И здесь
+        });
     }
 });
-// Мидлвар для админов
+
 function adminAuth(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).send('Доступ запрещен');
     
     jwt.verify(token, 'adminsecretkey', (err, decoded) => {
         if (err) return res.status(401).send('Недействительный токен');
-        req.adminId = decoded.id; // Добавляем ID администратора
+        req.adminId = decoded.id;
         next();
     });
 }
@@ -191,10 +194,9 @@ app.get('/api/user/orders', (req, res) => {
 
             const orders = results.map(order => {
                 try {
-                    // Убираем лишние кавычки и экранирование
                     const fixedItems = order.items
-                        .replace(/^"+|"+$/g, '') // Удаляем обрамляющие кавычки
-                        .replace(/\\"/g, '"');    // Убираем экранирование
+                        .replace(/^"+|"+$/g, '')
+                        .replace(/\\"/g, '"');
                     
                     return {
                         ...order,
@@ -210,7 +212,7 @@ app.get('/api/user/orders', (req, res) => {
         });
     });
 });
-// Вспомогательная функция для безопасного парсинга
+
 function safeJsonParse(str) {
     try {
         return JSON.parse(str);
@@ -244,15 +246,13 @@ app.get('/api/houses', (req, res) => {
             });
         }
         
-        res.json(results); // Всегда возвращаем массив, даже пустой
+        res.json(results);
     });
 });
 
-// Создание товара
 app.post('/api/houses', adminAuth, (req, res) => {
     const { name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms } = req.body;
     
-    // Проверка обязательных полей
     if (!name || !description || price === undefined) {
         return res.status(400).json({ error: 'Не заполнены обязательные поля: название, описание, цена' });
     }
@@ -278,7 +278,6 @@ app.post('/api/houses', adminAuth, (req, res) => {
             console.error('Ошибка добавления дома:', err);
             return res.status(500).json({ error: 'Ошибка сервера при добавлении товара' });
         }
-        // Возвращаем созданный товар со всеми данными
         const newHouseId = result.insertId;
         const selectSql = 'SELECT * FROM houses WHERE id = ?';
         db.query(selectSql, [newHouseId], (err, results) => {
@@ -300,15 +299,13 @@ app.get('/api/houses/:id', (req, res) => {
             return;
         }
         if (result.length > 0) {
-            const house = result[0];
-            res.json(house);
+            res.json(result[0]);
         } else {
             res.status(400).send('House not found');
         }
     });
 });
 
-// Удаление товара
 app.delete('/api/houses/:id', adminAuth, (req, res) => {
     const houseId = req.params.id;
     const sql = 'DELETE FROM houses WHERE id = ?';
@@ -325,12 +322,10 @@ app.delete('/api/houses/:id', adminAuth, (req, res) => {
     });
 });
 
-// Обновление товара
 app.put('/api/houses/:id', adminAuth, (req, res) => {
     const houseId = req.params.id;
     const { name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms } = req.body;
     
-    // Проверка обязательных полей
     if (!name || !description || price === undefined) {
         return res.status(400).json({ error: 'Не заполнены обязательные поля: название, описание, цена' });
     }
@@ -368,7 +363,6 @@ app.put('/api/houses/:id', adminAuth, (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Товар не найден' });
         }
-        // Возвращаем обновленный товар
         const selectSql = 'SELECT * FROM houses WHERE id = ?';
         db.query(selectSql, [houseId], (err, results) => {
             if (err || results.length === 0) {
@@ -512,9 +506,8 @@ app.delete('/api/compare/:productId', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
     const token = req.headers['authorization']?.split(' ')[1];
-    const { items, total, name, phone, email } = req.body; // Добавляем получение данных
+    const { items, total, name, phone, email } = req.body;
 
-    // Проверка обязательных полей
     if (!name || !phone || !email) {
         return res.status(400).json({ error: "Заполните все обязательные поля" });
     }
@@ -551,8 +544,6 @@ app.post('/api/orders', (req, res) => {
     });
 });
 
-// Отчёты
-// Получение списка пользователей (для админки)
 app.get('/api/admin/users', adminAuth, (req, res) => {
     const sql = 'SELECT id, username, email, phone, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") as created_at FROM users';
     db.query(sql, (err, results) => {
@@ -564,7 +555,6 @@ app.get('/api/admin/users', adminAuth, (req, res) => {
     });
 });
 
-// Удаление пользователя
 app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
     const userId = req.params.id;
     const sql = 'DELETE FROM users WHERE id = ?';
@@ -581,7 +571,6 @@ app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
     });
 });
 
-// Добавляем новые маршруты для отчётов
 app.get('/api/admin/reports/summary', adminAuth, (req, res) => {
     const queries = {
         totalProducts: 'SELECT COUNT(*) AS count FROM houses',
@@ -693,7 +682,6 @@ app.get('/api/admin/reports/users', adminAuth, (req, res) => {
     });
 });
 
-// Получение заказов (для админки)
 app.get('/api/admin/orders', adminAuth, (req, res) => {
     const sql = `
         SELECT 
@@ -715,10 +703,8 @@ app.get('/api/admin/orders', adminAuth, (req, res) => {
             return res.status(500).json({ error: 'Ошибка сервера при получении заказов' });
         }
         
-        // Преобразуем строки items в массивы объектов
         const orders = results.map(order => {
             try {
-                // Если items - строка, парсим её
                 const items = typeof order.items === 'string' 
                     ? JSON.parse(order.items) 
                     : order.items;
@@ -729,10 +715,7 @@ app.get('/api/admin/orders', adminAuth, (req, res) => {
                 };
             } catch (e) {
                 console.error('Ошибка парсинга items:', e);
-                return {
-                    ...order,
-                    items: []
-                };
+                return { ...order, items: [] };
             }
         });
         
@@ -820,6 +803,12 @@ app.get('/api/notifications', (req, res) => {
             res.json(result);
         });
     });
+});
+
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'build')));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 app.listen(port, () => {
