@@ -16,7 +16,10 @@ const Login = ({ setToken, isAdmin }) => {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.post(`${API}/api/login`, { username, password });
+            // Для обычного входа всегда используем username
+            // Для админа — email (содержит @)
+            const loginField = isAdmin ? username : username.replace(/@.*/, '').trim() || username;
+            const res = await axios.post(`${API}/api/login`, { username, password, isAdmin: !!isAdmin });
             if (isAdmin) {
                 if (!res.data.isAdmin) { setError('Нет прав администратора'); return; }
                 localStorage.setItem('adminToken', res.data.token);

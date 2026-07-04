@@ -58,7 +58,9 @@ app.post('/api/login', (req, res) => {
         return res.status(400).json({ message: "Заполните все поля" });
     }
 
-    if (username.includes('@')) {
+    // Проверяем isAdmin флаг из запроса, иначе смотрим на @
+    const isAdminLogin = req.body.isAdmin || false;
+    if (isAdminLogin && username.includes('@')) {
         const sql = 'SELECT * FROM admins WHERE email = ?';
         db.query(sql, [username], async (err, result) => {
             if (err) {
