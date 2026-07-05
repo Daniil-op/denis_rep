@@ -18,16 +18,13 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Railway передаёт DATABASE_URL или отдельные переменные MYSQL_*
-const db = mysql.createConnection(
-    process.env.DATABASE_URL || {
-        host: process.env.MYSQL_HOST || 'localhost',
-        port: process.env.MYSQL_PORT || 3306,
-        user: process.env.MYSQL_USER || 'root',
-        password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'house_sales',
-        ssl: process.env.MYSQL_HOST ? { rejectUnauthorized: false } : false
-    }
-);
+const db = mysql.createConnection({
+    host: process.env.MYSQL_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT) || 3306,
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASSWORD || '',
+    database: process.env.MYSQL_DATABASE || 'house_sales',
+});
 
 db.connect((err) => {
     if (err) {
