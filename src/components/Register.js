@@ -6,6 +6,7 @@ import styles from './Login.module.css';
 
 const Register = () => {
     const [form, setForm] = useState({ username: '', password: '', email: '', phone: '' });
+    const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -30,7 +31,6 @@ const Register = () => {
                 <form onSubmit={handleSubmit}>
                     {[
                         ['username','Имя пользователя','text','username'],
-                        ['password','Пароль','password','••••••••'],
                         ['email','Email','email','email@example.com'],
                         ['phone','Телефон','text','+7 (___) ___-__-__'],
                     ].map(([key, label, type, ph]) => (
@@ -40,6 +40,16 @@ const Register = () => {
                                 onChange={e => setForm({...form, [key]: e.target.value})} required />
                         </div>
                     ))}
+                    <div className={styles.field}>
+                        <label>Пароль</label>
+                        <div className={styles.passWrap}>
+                            <input type={showPass ? 'text' : 'password'} placeholder="••••••••" value={form.password}
+                                onChange={e => setForm({...form, password: e.target.value})} required />
+                            <button type="button" className={styles.eyeBtn} onClick={() => setShowPass(!showPass)}>
+                                {showPass ? '🙈' : '👁️'}
+                            </button>
+                        </div>
+                    </div>
                     {error && <p className={styles.error}>{error}</p>}
                     <button type="submit" className={styles.btn} disabled={loading}>
                         {loading ? 'Загрузка...' : 'Зарегистрироваться'}

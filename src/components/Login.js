@@ -7,6 +7,7 @@ import styles from './Login.module.css';
 const Login = ({ setToken, isAdmin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -47,7 +48,12 @@ const Login = ({ setToken, isAdmin }) => {
                     </div>
                     <div className={styles.field}>
                         <label>Пароль</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" />
+                        <div className={styles.passWrap}>
+                            <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" />
+                            <button type="button" className={styles.eyeBtn} onClick={() => setShowPass(!showPass)}>
+                                {showPass ? '🙈' : '👁️'}
+                            </button>
+                        </div>
                     </div>
                     {error && <p className={styles.error}>{error}</p>}
                     <button type="submit" className={styles.btn} disabled={loading}>

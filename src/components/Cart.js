@@ -19,9 +19,10 @@ const Cart = ({ token }) => {
             .catch(() => setLoading(false));
     }, [token]);
 
-    const remove = async (id) => {
-        await axios.delete(`${API}/api/cart/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-        setCart(cart.filter(i => i.id !== id));
+    const remove = async (productId, cartIndex) => {
+        await axios.delete(`${API}/api/cart/${productId}`, { headers: { Authorization: `Bearer ${token}` } });
+        // Удаляем только конкретный элемент по индексу, а не все с таким id
+        setCart(prev => prev.filter((_, i) => i !== cartIndex));
     };
 
     const order = async (e) => {
@@ -52,7 +53,7 @@ const Cart = ({ token }) => {
                 ) : (
                     <>
                         <div className={styles.items}>
-                            {cart.map(item => (
+                            {cart.map((item, idx) => (
                                 <div key={item.id} className={styles.item}>
                                     <img src={item.image_url} alt={item.name} />
                                     <div className={styles.itemInfo}>
@@ -64,7 +65,7 @@ const Cart = ({ token }) => {
                                         </div>
                                         <div className={styles.itemPrice}>{Number(item.price).toLocaleString('ru-RU')} ₽</div>
                                     </div>
-                                    <button className={styles.removeBtn} onClick={() => remove(item.id)}>✕</button>
+                                    <button className={styles.removeBtn} onClick={() => remove(item.id, idx)}>✕</button>
                                 </div>
                             ))}
                         </div>
