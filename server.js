@@ -25,7 +25,7 @@ const db = mysql.createPool({
     password: process.env.MYSQL_PASSWORD || '',
     database: process.env.MYSQL_DATABASE || 'house_sales',
     waitForConnections: true,
-    connectionLimit: 4,
+    connectionLimit: 2,
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
@@ -97,32 +97,41 @@ function initTables() {
         )`,
     ];
 
-    tables.forEach(sql => {
-        db.query(sql, (err) => {
-            if (err) console.error('Ошибка создания таблицы:', err.message);
-        });
-    });
-
-    // Создаём админа по умолчанию если его нет
-    const adminPass = bcrypt.hashSync('admin123', 8);
-    db.query(
-        'INSERT IGNORE INTO admins (email, password) VALUES (?, ?)',
-        ['admin@example.com', adminPass],
-        (err) => { if (err) console.error('Ошибка админа:', err.message); }
-    );
-
-    // Заполняем дома если таблица пустая
-    db.query('SELECT COUNT(*) as n FROM houses', (err, r) => {
-        if (err) { console.error('Ошибка проверки houses:', err.message); return; }
-        if (r[0].n === 0) {
-            console.log('Таблица houses пустая, заполняю демо-данными...');
-            seedHouses();
-        } else {
-            console.log(`Таблица houses: ${r[0].n} записей`);
+    // Выполняем последовательно — Filess.io имеет лимит 5 соединений
+    let idx = 0;
+    function nextTable() {
+        if (idx >= tables.length) {
+            afterTables();
+            return;
         }
-    });
+        db.query(tables[idx], (err) => {
+            if (err) console.error('Ошибка создания таблицы:', err.message);
+            idx++;
+            setTimeout(nextTable, 200);
+        });
+    }
+    nextTable();
 
-    console.log('Инициализация таблиц завершена');
+    function afterTables() {
+        const adminPass = bcrypt.hashSync('admin123', 8);
+        db.query(
+            'INSERT IGNORE INTO admins (email, password) VALUES (?, ?)',
+            ['admin@example.com', adminPass],
+            (err) => {
+                if (err) console.error('Ошибка админа:', err.message);
+                db.query('SELECT COUNT(*) as n FROM houses', (err, r) => {
+                    if (err) { console.error('Ошибка проверки houses:', err.message); return; }
+                    if (r[0].n === 0) {
+                        console.log('Таблица houses пустая, заполняю...');
+                        seedHouses();
+                    } else {
+                        console.log(`Таблица houses: ${r[0].n} записей`);
+                    }
+                });
+            }
+        );
+    }
+    console.log('Инициализация таблиц запущена');
 }
 
 function seedHouses() {
@@ -139,13 +148,19 @@ function seedHouses() {
         ['Ранчо', 'Одноэтажный дом с просторной планировкой.', 5500000, img, 150, 130, 1, 3, 2],
         ['Минимализм', 'Простота форм и функциональность.', 4800000, img, 80, 60, 1, 1, 1],
     ];
-    houses.forEach(h => {
+    let i = 0;
+    function nextHouse() {
+        if (i >= houses.length) { console.log('Демо-дома добавлены'); return; }
         db.query(
             'INSERT INTO houses (name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms) VALUES (?,?,?,?,?,?,?,?,?)',
-            h, (err) => { if (err) console.error('Ошибка seed:', err.message); }
+            houses[i], (err) => {
+                if (err) console.error('Ошибка seed:', err.message);
+                i++;
+                setTimeout(nextHouse, 150);
+            }
         );
-    });
-    console.log('Демо-дома добавлены');
+    }
+    nextHouse();
 }
 
 // Проверяем подключение и создаём таблицы
