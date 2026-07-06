@@ -17,21 +17,146 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Railway передаёт DATABASE_URL или отдельные переменные MYSQL_*
-const db = mysql.createConnection({
+// Пул соединений — автоматически переподключается при разрыве
+const db = mysql.createPool({
     host: process.env.MYSQL_HOST || 'localhost',
     port: parseInt(process.env.MYSQL_PORT) || 3306,
     user: process.env.MYSQL_USER || 'root',
     password: process.env.MYSQL_PASSWORD || '',
     database: process.env.MYSQL_DATABASE || 'house_sales',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
 });
 
-db.connect((err) => {
+// Автоматическое создание таблиц при запуске (если их нет)
+function initTables() {
+    const tables = [
+        `CREATE TABLE IF NOT EXISTS users (
+            id INT NOT NULL AUTO_INCREMENT,
+            username VARCHAR(255) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            email VARCHAR(255) DEFAULT NULL,
+            phone VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS admins (
+            id INT NOT NULL AUTO_INCREMENT,
+            email VARCHAR(255) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY email (email)
+        )`,
+        `CREATE TABLE IF NOT EXISTS houses (
+            id INT NOT NULL AUTO_INCREMENT,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            price DECIMAL(12,2) NOT NULL,
+            image_url VARCHAR(500) NOT NULL,
+            area DECIMAL(10,2) DEFAULT NULL,
+            plotArea DECIMAL(10,2) DEFAULT NULL,
+            floors INT DEFAULT NULL,
+            bedrooms INT DEFAULT NULL,
+            bathrooms INT DEFAULT NULL,
+            PRIMARY KEY (id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS orders (
+            id INT NOT NULL AUTO_INCREMENT,
+            userId INT NOT NULL,
+            items TEXT NOT NULL,
+            total DECIMAL(12,2) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(20) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'В обработке',
+            PRIMARY KEY (id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS cart (
+            id INT NOT NULL AUTO_INCREMENT,
+            userId INT NOT NULL,
+            productId INT NOT NULL,
+            PRIMARY KEY (id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS compare (
+            id INT NOT NULL AUTO_INCREMENT,
+            userId INT NOT NULL,
+            productId INT NOT NULL,
+            PRIMARY KEY (id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS notifications (
+            id INT NOT NULL AUTO_INCREMENT,
+            message TEXT NOT NULL,
+            user_id INT DEFAULT NULL,
+            is_admin TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        )`,
+    ];
+
+    tables.forEach(sql => {
+        db.query(sql, (err) => {
+            if (err) console.error('Ошибка создания таблицы:', err.message);
+        });
+    });
+
+    // Создаём админа по умолчанию если его нет
+    const adminPass = bcrypt.hashSync('admin123', 8);
+    db.query(
+        'INSERT IGNORE INTO admins (email, password) VALUES (?, ?)',
+        ['admin@example.com', adminPass],
+        (err) => { if (err) console.error('Ошибка админа:', err.message); }
+    );
+
+    // Заполняем дома если таблица пустая
+    db.query('SELECT COUNT(*) as n FROM houses', (err, r) => {
+        if (err) { console.error('Ошибка проверки houses:', err.message); return; }
+        if (r[0].n === 0) {
+            console.log('Таблица houses пустая, заполняю демо-данными...');
+            seedHouses();
+        } else {
+            console.log(`Таблица houses: ${r[0].n} записей`);
+        }
+    });
+
+    console.log('Инициализация таблиц завершена');
+}
+
+function seedHouses() {
+    const img = 'https://m-strana.ru/upload/resize_cache/sprint.editor/196/830_830_1/196f21a43b7bb11516f841a11efbd9bf.webp';
+    const houses = [
+        ['Прованс', 'Уютный дом в стиле Прованс для тех, кто ценит комфорт.', 1000000, img, 135, 193, 2, 3, 2],
+        ['Классический', 'Классический дом с элегантным дизайном и просторными комнатами.', 1700000, img, 127, 184, 2, 3, 2],
+        ['Маяк', 'Дом в стиле Маяк с современным дизайном.', 1000000, img, 100, 150, 2, 2, 1],
+        ['Шале', 'Уютный дом в стиле Шале.', 8000000, img, 150, 200, 2, 3, 2],
+        ['Русский', 'Дом в русском стиле с традиционным дизайном.', 1000000, img, 140, 180, 2, 3, 2],
+        ['Скандинавский', 'Минималистичный дизайн с натуральными материалами.', 7500000, img, 120, 90, 1, 2, 1],
+        ['Модерн', 'Современная архитектура с панорамными окнами.', 12500000, img, 220, 180, 2, 4, 3],
+        ['Лофт', 'Индустриальный стиль с высокими потолками.', 6800000, img, 95, 70, 1, 1, 1],
+        ['Ранчо', 'Одноэтажный дом с просторной планировкой.', 5500000, img, 150, 130, 1, 3, 2],
+        ['Минимализм', 'Простота форм и функциональность.', 4800000, img, 80, 60, 1, 1, 1],
+    ];
+    houses.forEach(h => {
+        db.query(
+            'INSERT INTO houses (name, description, price, image_url, area, plotArea, floors, bedrooms, bathrooms) VALUES (?,?,?,?,?,?,?,?,?)',
+            h, (err) => { if (err) console.error('Ошибка seed:', err.message); }
+        );
+    });
+    console.log('Демо-дома добавлены');
+}
+
+// Проверяем подключение и создаём таблицы
+db.getConnection((err, conn) => {
     if (err) {
-        console.error('Error connecting to database:', err);
+        console.error('Error connecting to database:', err.message);
         return;
     }
     console.log('Connected to database');
+    conn.release();
+    initTables();
 });
 
 app.post('/api/register', (req, res) => {
