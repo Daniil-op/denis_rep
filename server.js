@@ -25,7 +25,7 @@ const db = mysql.createPool({
     password: process.env.MYSQL_PASSWORD || '',
     database: process.env.MYSQL_DATABASE || 'house_sales',
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 4,
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
