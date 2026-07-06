@@ -1,67 +1,94 @@
 import React, { useState } from 'react';
+import styles from './Login.module.css';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import API from '../api';
-import styles from './Login.module.css';
+import logo from '../images/logo.png';
 
-const Login = ({ setToken, isAdmin }) => {
+const Login = ({ setToken, setAdminToken }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setIsLoading(true);
         setError('');
+        
         try {
-            // Для обычного входа всегда используем username
-            // Для админа — email (содержит @)
-            const loginField = isAdmin ? username : username.replace(/@.*/, '').trim() || username;
-            const res = await axios.post(`${API}/api/login`, { username, password, isAdmin: !!isAdmin });
-            if (isAdmin) {
-                if (!res.data.isAdmin) { setError('Нет прав администратора'); return; }
-                localStorage.setItem('adminToken', res.data.token);
-                setToken(res.data.token);
-                navigate('/admin');
+            const response = await axios.post(
+                '/api/login',
+                { username, password },
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+            
+            if (response.data.isAdmin) {
+                localStorage.setItem('adminToken', response.data.token);
+                setAdminToken(response.data.token);
+                navigate('/admin', { replace: true }); // Добавьте replace
             } else {
-                localStorage.setItem('token', res.data.token);
-                setToken(res.data.token);
-                navigate('/account');
+                localStorage.setItem('token', response.data.token);
+                setToken(response.data.token);
+                navigate('/account', { replace: true }); // Добавьте replace
             }
-        } catch (err) {
-            setError(err.response?.data?.message || 'Неверный логин или пароль');
-        } finally { setLoading(false); }
+        } catch (error) {
+            // Уточнённая обработка ошибок
+            const errorMessage = error.response?.data?.message || 'Ошибка входа';
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <div className={styles.page}>
-            <div className={styles.card}>
-                <Link to="/" className={styles.logo}>🏠 ДомСтрой</Link>
-                <h1>{isAdmin ? 'Вход для администратора' : 'Вход в аккаунт'}</h1>
+        <div className={styles.container}>
+            <header className={styles.header}>
+                <Link to="/">
+                    <img src={logo} alt="Logo" className={styles.logo} />
+                </Link>
+                <div className={styles.headerButtons}>
+                    <Link to="/">Главная</Link>
+                    <Link to="/register">Регистрация</Link>
+                </div>
+            </header>
+            
+            <div className={styles.loginSection}>
+                <h1>Вход</h1>
                 <form onSubmit={handleLogin}>
-                    <div className={styles.field}>
-                        <label>{isAdmin ? 'Email' : 'Имя пользователя'}</label>
-                        <input type="text" value={username} onChange={e => setUsername(e.target.value)} required placeholder={isAdmin ? 'admin@example.com' : 'username'} />
-                    </div>
-                    <div className={styles.field}>
-                        <label>Пароль</label>
-                        <div className={styles.passWrap}>
-                            <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" />
-                            <button type="button" className={styles.eyeBtn} onClick={() => setShowPass(!showPass)}>
-                                {showPass ? '🙈' : '👁️'}
-                            </button>
-                        </div>
-                    </div>
-                    {error && <p className={styles.error}>{error}</p>}
-                    <button type="submit" className={styles.btn} disabled={loading}>
-                        {loading ? 'Загрузка...' : 'Войти'}
+                    <input
+                        type="text"
+                        placeholder="Имя пользователя или email"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                        autoComplete="username"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Пароль"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password" // Добавлено
+                    />
+                    <button type="submit" disabled={isLoading}>
+                        {isLoading ? 'Загрузка...' : 'Войти'}
                     </button>
                 </form>
-                {!isAdmin && <p className={styles.hint}>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></p>}
+                {error && <p className={styles.error}>{error}</p>}
             </div>
+            
+            <footer className={styles.footer}>
+                <div className={styles.footerButtons}>
+                    <button>8 (800) 355-20-20</button>
+                    <button>Почта</button>
+                    <button>ВКонтакте</button>
+                    <button>Telegram</button>
+                    <button>WhatsApp</button>
+                </div>
+                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
+            </footer>
         </div>
     );
 };

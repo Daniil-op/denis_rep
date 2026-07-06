@@ -17,33 +17,69 @@ const App = () => {
     useEffect(() => {
         if (token) {
             try {
-                const decoded = jwtDecode(token);
-                if (decoded.exp < Date.now() / 1000) {
-                    localStorage.removeItem('token');
-                    setToken(null);
+                const decodedToken = jwtDecode(token);
+                if (decodedToken.exp < Date.now() / 1000) {
+                    handleLogout();
                 }
-            } catch {
-                localStorage.removeItem('token');
-                setToken(null);
+            } catch (error) {
+                handleLogout();
             }
         }
     }, [token]);
 
-    const handleLogout = () => { localStorage.removeItem('token'); setToken(null); };
-    const handleAdminLogout = () => { localStorage.removeItem('adminToken'); setAdminToken(null); };
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        setToken(null);
+    };
+
+    const handleAdminLogout = () => {
+        localStorage.removeItem('adminToken');
+        setAdminToken(null);
+    };
 
     return (
         <Router>
             <Routes>
+                {/* Основной маршрут */}
                 <Route path="/" element={<Home token={token} />} />
-                <Route path="/cart" element={<Cart token={token} />} />
-                <Route path="/compare" element={<Compare token={token} />} />
-                <Route path="/product/:id" element={<ProductPage token={token} />} />
-                <Route path="/login" element={token ? <Navigate to="/account" /> : <Login setToken={setToken} />} />
-                <Route path="/register" element={token ? <Navigate to="/account" /> : <Register />} />
-                <Route path="/account" element={token ? <UserAccount handleLogout={handleLogout} /> : <Navigate to="/login" />} />
-                <Route path="/admin" element={adminToken ? <AdminAccount handleLogout={handleAdminLogout} /> : <Navigate to="/admin/login" />} />
-                <Route path="/admin/login" element={adminToken ? <Navigate to="/admin" /> : <Login setToken={setAdminToken} isAdmin={true} />} />
+
+                {/* Маршрут для страницы товара */}
+                <Route 
+                    path="/products/:id" 
+                    element={<ProductPage token={token} />}  // token передается как пропс
+                />
+
+                {/* Защищенные маршруты */}
+                <Route path="/cart" element={
+                    token ? <Cart token={token} /> : <Navigate to="/login" />
+                }/>
+
+                <Route path="/compare" element={
+                    token ? <Compare token={token} /> : <Navigate to="/login" />
+                }/>
+
+                {/* Авторизация */}
+                <Route path="/login" element={
+                    token || adminToken 
+                        ? <Navigate to={adminToken ? "/admin" : "/account"} /> 
+                        : <Login setToken={setToken} setAdminToken={setAdminToken} />
+                }/>
+
+                <Route path="/register" element={
+                    token ? <Navigate to="/account" /> : <Register />
+                }/>
+
+                {/* Аккаунты */}
+                <Route path="/account" element={
+                    token ? <UserAccount handleLogout={handleLogout} /> : <Navigate to="/login" />
+                }/>
+
+                <Route path="/admin" element={
+                    adminToken ? <AdminAccount handleLogout={handleAdminLogout} /> : <Navigate to="/login" />
+                }/>
+
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </Router>
     );

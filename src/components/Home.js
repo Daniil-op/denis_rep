@@ -1,220 +1,187 @@
 import React, { useState, useEffect } from 'react';
+import styles from './Home.module.css';
+import logo from '../images/logo.png'; // Путь к вашему логотипу
+import banner1 from '../images/banner1.png'; // Путь к вашему первому баннеру
+import banner2 from '../images/banner2.png'; // Путь к вашему второму баннеру
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import Nav from './Nav';
-import Footer from './Footer';
-import API from '../api';
-import styles from './Home.module.css';
+import specialistImage from '../images/specialist.png'; // Путь к изображению специалиста
+import step1 from '../images/step1.png';
+import step2 from '../images/step2.png';
+import step3 from '../images/step3.png';
+import step4 from '../images/step4.png';
 
 const Home = ({ token }) => {
-    const [houses, setHouses] = useState([]);
+    const ITEMS_PER_PAGE = 6;
+
+    const [currentBanner, setCurrentBanner] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    
+    const banners = [banner1, banner2];
+    const [houses, setHouses] = useState([]); // Добавлено состояние для домов
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
-    const [priceFilter, setPriceFilter] = useState('all');
-    const [sort, setSort] = useState('default');
+    const [error, setError] = useState(null);
 
-    useEffect(() => {
-        axios.get(`${API}/api/houses`).then(r => {
-            setHouses(r.data);
-            setLoading(false);
-        }).catch(() => setLoading(false));
-    }, []);
+    const handleBannerChange = (index) => {
+        setCurrentBanner(index);
+    };
 
-    let filtered = houses.filter(h => {
-        const matchSearch = h.name.toLowerCase().includes(search.toLowerCase()) ||
-            h.description?.toLowerCase().includes(search.toLowerCase());
-        const price = parseFloat(h.price);
-        const matchPrice = priceFilter === 'all' ||
-            (priceFilter === 'low' && price < 3000000) ||
-            (priceFilter === 'mid' && price >= 3000000 && price < 8000000) ||
-            (priceFilter === 'high' && price >= 8000000);
-        return matchSearch && matchPrice;
+    console.log('Состояние:', {
+        housesCount: houses.length,
+        currentPage,
+        visible: currentPage * ITEMS_PER_PAGE,
+        hasMore: currentPage * ITEMS_PER_PAGE < houses.length
     });
 
-    if (sort === 'price_asc') filtered = [...filtered].sort((a,b) => a.price - b.price);
-    if (sort === 'price_desc') filtered = [...filtered].sort((a,b) => b.price - a.price);
-    if (sort === 'area') filtered = [...filtered].sort((a,b) => b.area - a.area);
+    useEffect(() => {
+        const fetchHouses = async () => {
+            try {
+                const response = await axios.get('/api/houses');
+                console.log('Ответ API:', response.data); // Проверка данных с сервера
+                setHouses(response.data);
+            } catch (err) {
+                setError('Ошибка загрузки');
+                console.error('Ошибка API:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchHouses();
+    }, []);
+
+    const visibleHouses = houses.slice(0, currentPage * ITEMS_PER_PAGE);
+    const hasMore = currentPage * ITEMS_PER_PAGE < houses.length;
+
+    const handleShowMore = () => {
+        hasMore ? setCurrentPage(p => p + 1) : setCurrentPage(1);
+    };
+
+    // 4. Условия отображения
+    if (loading) return <div className={styles.loading}>Загрузка...</div>;
+    if (error) return <div className={styles.error}>{error}</div>;
 
     return (
-        <div className={styles.page}>
-            <Nav token={token} />
-
-            {/* Hero */}
-            <section className={styles.hero}>
-                <div className={styles.heroOverlay} />
-                <div className={styles.heroContent}>
-                    <div className={styles.heroBadge}>🏆 Более 20 проектов домов</div>
-                    <h1>Найдите дом<br/><span>своей мечты</span></h1>
-                    <p>Широкий выбор проектов от 1 млн рублей. Строим быстро и качественно.</p>
-                    <div className={styles.searchRow}>
-                        <div className={styles.searchBox}>
-                            <span className={styles.searchIcon}>🔍</span>
-                            <input
-                                type="text"
-                                placeholder="Поиск по названию или описанию..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                            />
-                        </div>
-                        <Link to="/compare" className={styles.compareBtn}>Сравнить дома</Link>
-                    </div>
+        <div className={styles.container}>
+            <header className={styles.header}>
+                <Link to="/">
+                    <img src={logo} alt="Logo" className={styles.logo} />
+                </Link>
+                
+                <div className={styles.headerButtons}>
+                    <Link to="/cart">Корзина</Link>
+                    <Link to="/compare">Сравнение</Link>
+                    {token ? (
+                        <Link to="/account">Аккаунт</Link>
+                    ) : (
+                        <>
+                            <Link to="/login">Вход</Link>
+                            <Link to="/register">Регистрация</Link>
+                        </>
+                    )}
                 </div>
-            </section>
-
-            {/* Stats */}
-            <section className={styles.stats}>
-                {[
-                    ['20+', 'Проектов домов'],
-                    ['500+', 'Довольных клиентов'],
-                    ['4 мес', 'Средний срок строительства'],
-                    ['10 лет', 'Опыт работы'],
-                ].map(([n, l]) => (
-                    <div key={l} className={styles.stat}>
-                        <b>{n}</b>
-                        <span>{l}</span>
+            </header>
+            <div className={styles.bannerSlider}>
+                <img src={banners[currentBanner]} alt={`Banner ${currentBanner + 1}`} className={styles.bannerImage} />
+                <div className={styles.bannerControls}>
+                    {banners.map((_, index) => (
+                        <button key={index} onClick={() => handleBannerChange(index)} className={currentBanner === index ? styles.active : ''}>
+                            {index + 1}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className={styles.houseCards}>
+                {visibleHouses.map(house => (
+                    <div key={house.id} className={styles.houseCard}>
+                        <Link to={`/products/${house.id}`}>
+                            <img 
+                                src={house.image_url} 
+                                alt={house.name}
+                                className={styles.houseImage}
+                            />
+                        </Link>
+                        <h3>{house.name}</h3>
+                        <div className={styles.houseSpecs}>
+                            <p>Цена: {new Intl.NumberFormat('ru-RU').format(house.price)} руб.</p>
+                            <p>Площадь: {house.area} м²</p>
+                            <p>Этажей: {house.floors}</p>
+                        </div>
                     </div>
                 ))}
-            </section>
+            </div>
 
-            {/* Catalog */}
-            <section className={styles.catalog}>
-                <div className={styles.catalogHeader}>
-                    <h2>Каталог домов</h2>
-                    <div className={styles.controls}>
-                        <div className={styles.filters}>
-                            {[['all','Все'],['low','до 3 млн'],['mid','3–8 млн'],['high','от 8 млн']].map(([val,label]) => (
-                                <button key={val}
-                                    className={priceFilter === val ? styles.filterActive : styles.filter}
-                                    onClick={() => setPriceFilter(val)}>{label}</button>
-                            ))}
+            {houses.length > 0 && (
+                <div className={styles.pagination}>
+                    <button 
+                        onClick={handleShowMore}
+                        className={styles.showMoreButton}
+                    >
+                        {hasMore ? 'Показать ещё' : 'Скрыть'}
+                    </button>
+                    <span>
+                        Страница {currentPage} | 
+                        Показано {visibleHouses.length} из {houses.length}
+                    </span>
+                </div>
+            )}
+            <div className={styles.specialistCard}>
+                <div className={styles.specialistImageWrapper}>
+                    <img src={specialistImage} alt="Specialist" className={styles.specialistImage} />
+                    <h3>Максим Сурдин</h3>
+                </div>
+                <div className={styles.specialistInfo}>
+                    <p>Руководитель отдела продаж</p>
+                    <ul className={styles.contactList}>
+                        <li>+7 485 383 10 52</li>
+                        <li>zakaz@stroi.ru</li>
+                        <li>г. Новосибирск, ул. Советская, д. 23, оф. 401</li>
+                    </ul>
+                </div>
+            </div>
+            <div className={styles.instructionSection}>
+                <h2>Как сделать заказ?</h2>
+                <div className={styles.instructionSteps}>
+                    <div className={styles.instructionStep}>
+                        <div className={styles.instructionIcon}>
+                            <img src={step1} alt="Шаг 1 - Выбор дома"/>
                         </div>
-                        <select className={styles.sort} value={sort} onChange={e => setSort(e.target.value)}>
-                            <option value="default">По умолчанию</option>
-                            <option value="price_asc">Цена ↑</option>
-                            <option value="price_desc">Цена ↓</option>
-                            <option value="area">По площади</option>
-                        </select>
+                        <div className={styles.stepNumber}>1</div>
+                        <p>Первым шагом определитесь с выбором дома, по желанию посоветуйтесь с нашим консультантом</p>
+                    </div>
+                    <div className={styles.instructionStep}>
+                        <div className={styles.instructionIcon}>
+                            <img src={step2} alt="Шаг 2 - Добавление в корзину"/>
+                        </div>
+                        <div className={styles.stepNumber}>2</div>
+                        <p>Вторым шагом добавьте понравившийся дом в корзину</p>
+                    </div>
+                    <div className={styles.instructionStep}>
+                        <div className={styles.instructionIcon}>
+                            <img src={step3} alt="Шаг 3 - Оплата"/>
+                        </div>
+                        <div className={styles.stepNumber}>3</div>
+                        <p>Третьим шагом оплатите заказ, выбрав один из нескольких вариантов оплаты</p>
+                    </div>
+                    <div className={styles.instructionStep}>
+                        <div className={styles.instructionIcon}>
+                            <img src={step4} alt="Шаг 4 - Подтверждение"/>
+                            
+                        </div>
+                        <div className={styles.stepNumber}>4</div>
+                        <p>Четвертым шагом ожидайте звонка нашего менеджера, который проведет контрольную явку до покупки завершения</p>
                     </div>
                 </div>
-
-                {loading ? (
-                    <div className={styles.loading}>
-                        <div className={styles.spinner}/>
-                        <p>Загружаем каталог...</p>
-                    </div>
-                ) : (
-                    <div className={styles.grid}>
-                        {filtered.map(h => (
-                            <Link to={`/product/${h.id}`} key={h.id} className={styles.card}>
-                                <div className={styles.cardImg}>
-                                    <img src={h.image_url} alt={h.name} />
-                                    <div className={styles.cardOverlay}>
-                                        <span>Подробнее →</span>
-                                    </div>
-                                    <div className={styles.badge}>{h.floors} эт.</div>
-                                </div>
-                                <div className={styles.cardBody}>
-                                    <h3>{h.name}</h3>
-                                    <p className={styles.cardDesc}>{h.description?.slice(0,70)}...</p>
-                                    <div className={styles.specs}>
-                                        <div className={styles.specItem}>
-                                            <span>📐</span>
-                                            <b>{h.area} м²</b>
-                                        </div>
-                                        <div className={styles.specItem}>
-                                            <span>🛏</span>
-                                            <b>{h.bedrooms}</b>
-                                        </div>
-                                        <div className={styles.specItem}>
-                                            <span>🚿</span>
-                                            <b>{h.bathrooms}</b>
-                                        </div>
-                                        <div className={styles.specItem}>
-                                            <span>🏢</span>
-                                            <b>{h.floors} эт.</b>
-                                        </div>
-                                    </div>
-                                    <div className={styles.cardFooter}>
-                                        <div className={styles.price}>
-                                            <span>от</span>
-                                            <b>{Number(h.price).toLocaleString('ru-RU')} ₽</b>
-                                        </div>
-                                        <div className={styles.cardBtn}>В каталог</div>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                        {filtered.length === 0 && (
-                            <div className={styles.empty}>
-                                <div>🏠</div>
-                                <p>По вашему запросу ничего не найдено</p>
-                                <button onClick={() => { setSearch(''); setPriceFilter('all'); }}>Сбросить фильтры</button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </section>
-
-            {/* Why us */}
-            <section className={styles.why}>
-                <div className={styles.whyInner}>
-                    <h2>Почему выбирают нас</h2>
-                    <div className={styles.whyGrid}>
-                        {[
-                            ['🏗️', 'Качественное строительство', 'Используем только проверенные материалы и технологии'],
-                            ['💰', 'Прозрачные цены', 'Никаких скрытых платежей — фиксированная стоимость'],
-                            ['⚡', 'Быстрые сроки', 'Средний срок строительства от 4 месяцев'],
-                            ['🛡️', 'Гарантия 5 лет', 'Полная гарантия на все конструктивные элементы'],
-                        ].map(([icon, title, desc]) => (
-                            <div key={title} className={styles.whyCard}>
-                                <div className={styles.whyIcon}>{icon}</div>
-                                <h4>{title}</h4>
-                                <p>{desc}</p>
-                            </div>
-                        ))}
-                    </div>
+            </div>
+            <footer className={styles.footer}>
+                <div className={styles.footerButtons}>
+                    <button>8 (800) 355-20-20</button>
+                    <button>Почта</button>
+                    <button>ВКонтакте</button>
+                    <button>Telegram</button>
+                    <button>WhatsApp</button>
                 </div>
-            </section>
-
-            {/* Steps */}
-            <section className={styles.steps}>
-                <div className={styles.stepsInner}>
-                    <h2>Как сделать заказ?</h2>
-                    <div className={styles.stepsRow}>
-                        {[
-                            ['1', 'Выберите проект', 'Просмотрите каталог и выберите подходящий проект дома'],
-                            ['2', 'Добавьте в корзину', 'Нажмите кнопку и сохраните выбранный проект'],
-                            ['3', 'Оформите заявку', 'Укажите контактные данные для связи'],
-                            ['4', 'Получите звонок', 'Менеджер свяжется с вами в течение часа'],
-                        ].map(([n, title, desc], i) => (
-                            <React.Fragment key={n}>
-                                <div className={styles.step}>
-                                    <div className={styles.stepNum}>{n}</div>
-                                    <h4>{title}</h4>
-                                    <p>{desc}</p>
-                                </div>
-                                {i < 3 && <div className={styles.stepArrow}>→</div>}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* CTA */}
-            <section className={styles.cta}>
-                <div className={styles.ctaInner}>
-                    <h2>Готовы начать строительство?</h2>
-                    <p>Оставьте заявку и мы поможем подобрать идеальный проект</p>
-                    <div className={styles.ctaBtns}>
-                        <Link to={token ? '/cart' : '/register'} className={styles.ctaBtn}>
-                            {token ? 'Перейти в корзину' : 'Зарегистрироваться'}
-                        </Link>
-                        <Link to="/compare" className={styles.ctaBtnOutline}>Сравнить проекты</Link>
-                    </div>
-                </div>
-            </section>
-
-            <Footer />
+                <p>Пользовательское соглашение © Все права защищены 1997–2024</p>
+            </footer>
         </div>
     );
 };
